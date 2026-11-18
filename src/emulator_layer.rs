@@ -7,16 +7,53 @@ pub struct Emulator6502 {
     idx_y: u8,  // Index Y register for indirect addressing
     pcl: u8,    // Low byte of the program counter
     pch: u8,    // High byte of the program counter
+
+    memory: [u8; 2^16], // The 650X series can address 65K of memory
 }
 
 impl Emulator6502 {
     pub fn new() -> Self {
         Self { 
-            
+            accumulator: 0,
+            psr: 0,
+            sp: 0,
+            idx_x: 0,
+            idx_y: 0,
+            pcl: 0,
+            pch: 0,
+            memory: [0; 2^16],
         }
     }
 
     pub fn run_emulation(&self) {
 
+    }
+
+    fn negative_flag(&self) -> bool {
+        (self.psr >> 7) & 1 == 1
+    }
+
+    fn overflow_flag(&self) -> bool {
+        (self.psr >> 6) & 1 == 1
+    }
+
+    fn break_flag(&self) -> bool {
+        (self.psr >> 4) & 1 == 1
+    }
+
+    fn decimal_flag(&self) -> bool {
+        (self.psr >> 3) & 1 == 1
+    }
+
+    fn interrupt_disable_flag(&self) -> bool {
+        (self.psr >> 2) & 1 == 1
+    }
+
+    fn zero_flag(&self) -> bool {
+        (self.psr >> 1) & 1 == 1
+    }
+
+    fn carry_flag(&self) -> bool {
+        self.psr & 1 == 1
     }
 }
