@@ -1,3 +1,4 @@
+mod opcodes;
 
 pub struct Emulator6502 {
     accumulator: u8,
@@ -9,6 +10,10 @@ pub struct Emulator6502 {
     pch: u8,    // High byte of the program counter
 
     memory: [u8; 2^16], // The 650X series can address 65K of memory
+
+    // Various constants for the processor
+    micros_per_cycle: u8,
+    instructions: [opcodes::Opcode; 256],
 }
 
 impl Emulator6502 {
@@ -22,6 +27,37 @@ impl Emulator6502 {
             pcl: 0,
             pch: 0,
             memory: [0; 2^16],
+            micros_per_cycle: 1,    // The baseline 6502 was a 1 MHz processor
+            instructions: [
+                // 0x00
+                opcodes::Opcode {
+                    op_bytes: 1,
+                    op_cycles: 7,
+                    mnemonic: "BRK"
+                },
+                // 0x01
+                opcodes::Opcode {
+                    op_bytes: 2,
+                    op_cycles: 6,
+                    mnemonic: "ORA ($NN, X)"
+                },
+                opcodes::Opcode {
+                    op_bytes: 1,
+                    op_cycles: 1,
+                    mnemonic: "NOP"
+                },
+                opcodes::Opcode {
+                    op_bytes: 1,
+                    op_cycles: 1,
+                    mnemonic: "NOP"
+                },
+                opcodes::Opcode {
+                    op_bytes: 1,
+                    op_cycles: 1,
+                    mnemonic: "NOP"
+                },
+                // 0x05
+            ]
         }
     }
 
