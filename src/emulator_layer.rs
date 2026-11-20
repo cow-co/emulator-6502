@@ -2,8 +2,8 @@ pub struct Opcode {
     // TODO Maybe have addressing-type as a field here? Would that actually help at all though?
     op_bytes: u8,
     op_cycles: u8,      // Important in allowing us to run the emulator at the correct speed
-    mnemonic: str,   // For disassembling
-    op_func: fn() -> (),
+    mnemonic: &'static str,   // For disassembling
+    op_func: fn(&mut Emulator6502) -> (),
 }
 
 pub struct Emulator6502 {
@@ -18,7 +18,7 @@ pub struct Emulator6502 {
 
     // Various constants for the processor
     micros_per_cycle: u8,
-    instructions: [opcodes::Opcode; 256],
+    instructions: [Opcode; 256],
 }
 
 impl Emulator6502 {
@@ -34,941 +34,1646 @@ impl Emulator6502 {
             micros_per_cycle: 1,    // The baseline 6502 was a 1 MHz processor
             instructions: [
                 // 0x00
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 7,
                     mnemonic: "BRK"
                 },
                 // 0x01
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ORA (${}, X)"
                 },
-                opcodes::Opcode {
+                // 0x02
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "NOP",
                     op_func: nop,
                 },
-                opcodes::Opcode {
+                // 0x03
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "NOP",
                     op_func: nop,
                 },
-                opcodes::Opcode {
+                // 0x04
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "NOP",
                     op_func: nop,
                 },
                 // 0x05
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "ORA ${}",
                 },
                 // 0x06
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 1,
                     mnemonic: "ASL ${}",
                 },
-                opcodes::Opcode {
+                // 0x07
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "NOP",
                     op_func: nop,
                 },
                 // 0x08
-                opcodes::Opcode {
-                    op_bytes: 1,
-                    op_cycles: 1,
-                    mnemonic: "PHP",
-                },
-                // 0x08
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 3,
                     mnemonic: "PHP",
                 },
                 // 0x09
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "ORA #{}",
                 },
                 // 0x0A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "ASL A",
                 },
+                // 0x0B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x0C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x0D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ORA ${}",
                 },
                 // 0x0E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "ASL ${}",
                 },
+                // 0x0F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x10
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BPL ${}",
                 },
                 // 0x11
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "ORA (${}), Y",
                 },
+                // 0x12
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x13
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x14
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x15
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "ORA ${}",
                 },
                 // 0x16
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ASL ${}, X",
                 },
+                // 0x17
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x18
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "CLC",
                 },
                 // 0x19
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ORA ${}, Y",
                 },
+                // 0x1A
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x1B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x1C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x1D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ORA ${}, X",
                 },
                 // 0x1E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "ASL ${}, X",
                 },
+                // 0x1F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x20
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "JSR ${}",
                 },
                 // 0x21
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "AND (${}, X)",
                 },
+                // 0x22
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x23
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x24
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "BIT ${}",
                 },
                 // 0x25
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "AND ${}",
                 },
                 // 0x26
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "ROL ${}",
                 },
+                // 0x27
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x28
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 4,
                     mnemonic: "PLP",
                 },
                 // 0x29
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "AND #{}",
                 },
                 // 0x2A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "ROL A",
                 },
+                // 0x2B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x2C
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "BIT ${}",
                 },
                 // 0x2D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "AND ${}",
                 },
                 // 0x2E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "ROL ${}",
                 },
+                // 0x2F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x30
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BMI ${}",
                 },
                 // 0x31
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "AND (${}), Y",
                 },
+                // 0x32
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x33
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x34
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x35
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "AND ${}, X",
                 },
                 // 0x36
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ROL ${}, X",
                 },
+                // 0x37
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x38
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "SEC",
                 },
                 // 0x39
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "AND ${}, Y",
                 },
+                // 0x3A
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x3B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x3C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x3D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "AND ${}, X",
                 },
                 // 0x3E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "ROL ${}, X",
                 },
+                // 0x3F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x40
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 6,
                     mnemonic: "RTI",
                 },
                 // 0x41
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "EOR (${}, X)",
                 },
+                // 0x42
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x43
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x44
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x45
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "EOR ${}",
                 },
                 // 0x46
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "LSR ${}",
                 },
+                // 0x47
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x48
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 3,
                     mnemonic: "PHA",
                 },
                 // 0x49
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "EOR #{}",
                 },
                 // 0x4A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "LSR A",
                 },
+                // 0x4B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x4C
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 3,
                     mnemonic: "JMP ${}",
                 },
                 // 0x4D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "EOR ${}",
                 },
                 // 0x4E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "LSR ${}",
                 },
+                // 0x4F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x50
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BVC ${}",
                 },
                 // 0x51
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "EOR (${}), Y",
                 },
+                // 0x52
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x53
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x54
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x55
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "EOR ${}, X",
                 },
                 // 0x56
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "LSR ${}, X",
                 },
+                // 0x57
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x58
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "CLI",
                 },
                 // 0x59
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "EOR ${}, Y",
                 },
+                // 0x5A
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x5B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x5C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x5D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "EOR ${}, X",
                 },
                 // 0x5E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "LSR ${}, X",
                 },
+                // 0x5F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x60
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 6,
                     mnemonic: "RTS",
                 },
                 // 0x61
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ADC (${}, X)",
                 },
+                // 0x62
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x63
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x64
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x65
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "ADC ${}",
                 },
                 // 0x66
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "ROR ${}",
                 },
+                // 0x67
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x68
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 4,
                     mnemonic: "PLA",
                 },
                 // 0x69
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "ADC #{}",
                 },
                 // 0x6A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "ROR A",
                 },
+                // 0x6B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x6C
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 5,
                     mnemonic: "JMP (${})",
                 },
                 // 0x6D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ADC #{}",
                 },
                 // 0x6E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "ROR ${}",
                 },
+                // 0x6F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x70
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BVS ${}",
                 },
                 // 0x71
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "ADC (${}), Y",
                 },
+                // 0x72
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x73
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x74
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x75
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "ADC ${}, X",
                 },
                 // 0x76
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ROR ${}, X",
                 },
+                // 0x77
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x78
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "SEI",
                 },
                 // 0x79
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ADC ${}, Y",
                 },
+                // 0x7A
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x7B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x7C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x7D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "ADC ${}, X",
                 },
                 // 0x7E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "ROR ${}, X",
                 },
+                // 0x7F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x80
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x81
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "STA (${}, X)",
                 },
-                // 0x86
-                opcodes::Opcode {
+                // 0x82
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x83
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x84
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "STY ${}",
                 },
                 // 0x85
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "STA ${}",
                 },
                 // 0x86
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "STX ${}",
                 },
+                // 0x87
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x88
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "DEY",
                 },
+                // 0x89
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x8A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TXA",
                 },
+                // 0x8B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x8C
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "STY ${}",
                 },
                 // 0x8D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "STA ${}",
                 },
                 // 0x8E
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "STX ${}",
                 },
+                // 0x8F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x90
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BCC ${}",
                 },
                 // 0x91
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "STA (${}), Y",
                 },
-                // 0x96
-                opcodes::Opcode {
+                // 0x92
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x93
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x94
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "STY ${}, X",
                 },
                 // 0x95
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "STA ${}, X",
                 },
                 // 0x96
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "STX ${}, Y",
                 },
-                // 0xA8
-                opcodes::Opcode {
+                // 0x97
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x98
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TYA",
                 },
                 // 0x99
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 5,
                     mnemonic: "STA ${}, Y",
                 },
                 // 0x9A
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TXS",
                 },
+                // 0x9B
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x9C
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0x9D
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 5,
                     mnemonic: "STA ${}, X",
                 },
+                // 0x9E
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0x9F
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xA0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "LDY #{}",
                 },
                 // 0xA1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "LDA (${}, X)",
                 },
                 // 0xA2
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "LDX #{}",
                 },
+                // 0xA3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xA4
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "LDY ${}",
                 },
                 // 0xA5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "LDA ${}",
                 },
                 // 0xA6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "LDX ${}",
                 },
+                // 0xA7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xA8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TAY",
                 },
                 // 0xA9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "LDA #{}",
                 },
                 // 0xAA
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TAX",
                 },
+                // 0xAB
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xAC
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDY ${}",
                 },
                 // 0xAD
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDA ${}",
                 },
                 // 0xAE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDX ${}",
                 },
+                // 0xAF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xB0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BCS ${}",
                 },
                 // 0xB1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "LDA (${}), Y",
                 },
+                // 0xB2
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xB3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xB4
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "LDY ${}, X",
                 },
                 // 0xB5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "LDA ${}, X",
                 },
                 // 0xB6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "LDX ${}, Y",
                 },
+                // 0xB7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xB8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "CLV",
                 },
                 // 0xB9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDA ${}, Y",
                 },
                 // 0xBA
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "TSX",
                 },
+                // 0xBB
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xBC
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDY ${}, X",
                 },
                 // 0xBD
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDA ${}, X",
                 },
                 // 0xBE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "LDX ${}, Y",
                 },
+                // 0xBF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xC0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "CPY #{}",
                 },
                 // 0xC1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "CMP (${}, X)",
                 },
+                // 0xC2
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xC3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xC4
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "CPY ${}",
                 },
                 // 0xC5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "CMP ${}",
                 },
                 // 0xC6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "DEC ${}",
                 },
+                // 0xC7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xC8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "INY",
                 },
                 // 0xC9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "CMP #{}",
                 },
                 // 0xCA
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "DEX",
                 },
+                // 0xCB
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xCC
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "CPY ${}",
                 },
                 // 0xCD
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "CMP ${}",
                 },
                 // 0xCE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "DEC ${}",
                 },
+                // 0xCF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xD0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BNE ${}",
                 },
                 // 0xD1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "CMP (${}), Y",
                 },
+                // 0xD2
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xD3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xD4
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xD5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "CMP ${}, X",
                 },
                 // 0xD6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "DEC ${}, X",
                 },
+                // 0xD7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xD8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "CLD",
                 },
                 // 0xD9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "CMP ${}, Y",
                 },
+                // 0xDA
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xDB
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xDC
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xDD
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "CMP ${}, X",
                 },
                 // 0xDE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "DEC ${}, X",
                 },
+                // 0xDF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xE0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "CPX #{}",
                 },
                 // 0xE1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "SBC (${}, X)",
                 },
+                // 0xE2
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xE3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xE4
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "CPX ${}",
                 },
                 // 0xE5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 3,
                     mnemonic: "SBC ${}",
                 },
                 // 0xE6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "INC ${}",
                 },
+                // 0xE7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xE8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "INX",
                 },
                 // 0xE9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "SBC #{}",
                 },
                 // 0xEA
-                opcodes::Opcode {
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xEB
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "NOP",
                     op_func: nop,
                 },
                 // 0xEC
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "CPX ${}",
                 },
                 // 0xED
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "SBC ${}",
                 },
                 // 0xEE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 6,
                     mnemonic: "INC ${}",
                 },
+                // 0xEF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xF0
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "BEQ ${}",
                 },
                 // 0xF1
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 5,
                     mnemonic: "SBC (${}), Y",
                 },
+                // 0xF2
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xF3
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xF4
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xF5
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 4,
                     mnemonic: "SBC ${}, X",
                 },
                 // 0xF6
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "INC ${}, X",
                 },
+                // 0xF7
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xF8
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 1,
                     op_cycles: 2,
                     mnemonic: "SED",
                 },
                 // 0xF9
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "SBC ${}, Y",
                 },
+                // 0xFA
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xFB
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
+                // 0xFC
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
+                },
                 // 0xFD
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 4,
                     mnemonic: "SBC ${}, X",
                 },
                 // 0xFE
-                opcodes::Opcode {
+                Opcode {
                     op_bytes: 3,
                     op_cycles: 7,
                     mnemonic: "INC ${}, X",
+                },
+                // 0xFF
+                Opcode {
+                    op_bytes: 1,
+                    op_cycles: 2,
+                    mnemonic: "NOP",
+                    op_func: nop,
                 },
             ]
         }
