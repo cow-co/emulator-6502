@@ -1,20 +1,19 @@
 pub struct Opcode {
-    // TODO Maybe have addressing-type as a field here? Would that actually help at all though?
     op_bytes: u8,
-    op_cycles: u8,      // Important in allowing us to run the emulator at the correct speed
-    mnemonic: &'static str,   // For disassembling
+    op_cycles: u8, // Important in allowing us to run the emulator at the correct speed
+    mnemonic: &'static str, // For disassembling
     op_func: fn(&mut Emulator6502) -> (),
 }
 
 pub struct Emulator6502 {
     accumulator: u8,
-    psr: u8,    // Processor status register (flags)
-    sp: u8,     // Stack pointer; the lower byte of the stack location
-    idx_x: u8,  // Index X register for indirect addressing
-    idx_y: u8,  // Index Y register for indirect addressing
-    pc: u16,    // Program counter; strictly, this was actually formed from two 8-bit registers (PCH and PCL)
+    psr: u8,   // Processor status register (flags)
+    sp: u8,    // Stack pointer; the lower byte of the stack location
+    idx_x: u8, // Index X register for indirect addressing
+    idx_y: u8, // Index Y register for indirect addressing
+    pc: u16, // Program counter; strictly, this was actually formed from two 8-bit registers (PCH and PCL)
 
-    memory: [u8; 2^16], // The 650X series can address 65K of memory
+    memory: [u8; 2 ^ 16], // The 650X series can address 65K of memory
 
     // Various constants for the processor
     micros_per_cycle: u8,
@@ -23,27 +22,27 @@ pub struct Emulator6502 {
 
 impl Emulator6502 {
     pub fn new() -> Self {
-        Self { 
+        Self {
             accumulator: 0,
             psr: 0,
             sp: 0,
             idx_x: 0,
             idx_y: 0,
-            pc:0,
-            memory: [0; 2^16],
-            micros_per_cycle: 1,    // The baseline 6502 was a 1 MHz processor
+            pc: 0,
+            memory: [0; 2 ^ 16],
+            micros_per_cycle: 1, // The baseline 6502 was a 1 MHz processor
             instructions: [
                 // 0x00
                 Opcode {
                     op_bytes: 1,
                     op_cycles: 7,
-                    mnemonic: "BRK"
+                    mnemonic: "BRK",
                 },
                 // 0x01
                 Opcode {
                     op_bytes: 2,
                     op_cycles: 6,
-                    mnemonic: "ORA (${}, X)"
+                    mnemonic: "ORA (${}, X)",
                 },
                 // 0x02
                 Opcode {
@@ -302,6 +301,7 @@ impl Emulator6502 {
                     op_bytes: 2,
                     op_cycles: 2,
                     mnemonic: "AND #{}",
+                    op_func: and_imm,
                 },
                 // 0x2A
                 Opcode {
@@ -662,6 +662,7 @@ impl Emulator6502 {
                     op_bytes: 2,
                     op_cycles: 6,
                     mnemonic: "ADC (${}, X)",
+                    op_func: adc_imm,
                 },
                 // 0x62
                 Opcode {
@@ -1675,13 +1676,11 @@ impl Emulator6502 {
                     mnemonic: "NOP",
                     op_func: nop,
                 },
-            ]
+            ],
         }
     }
 
-    pub fn run_emulation(&self) {
-
-    }
+    pub fn run_emulation(&self) {}
 
     fn negative_flag(&self) -> bool {
         (self.psr >> 7) & 1 == 1
@@ -1720,9 +1719,50 @@ impl Emulator6502 {
     }
 }
 
+/// No-op! Does nothing!
+fn nop(_state: &mut Emulator6502) -> () {
+    
+}
 
+fn zero_page_value(state: &Emulator6502, addr: u8) -> u8 {
+    state.memory[addr as usize]
+}
 
+/// Fetches a value from memory, via the indexed indirect addressing technique, which uses the X register.
+/// 
+/// `indexed_addr` should be *without* the X register added (this function takes care of that internally)
+fn indexed_indirect_value(state: &Emulator6502, indexed_addr: u8) -> u8 {
+    let indirected = indexed_addr + state.idx_x;
+    let low_byte = zero_page_value(state, indirected);
+    let high_byte = zero_page_value(state, indirected+1);
+    let effective_addr = double_byte_from_two_single_bytes(low_byte, high_byte);
+    state.memory[effective_addr as usize]
+}
 
-fn nop(state: &mut Emulator6502) -> () {
-    state.pc += 1;
+/// Concatenates two single-byte values into one 16-bit value. Usually used for constructing memory addresses.
+///
+/// Note the order of the low and high bytes.
+fn double_byte_from_two_single_bytes(low_byte: u8, high_byte: u8) -> u16 {
+    let mut result = low_byte as u16;
+    result = result & (high_byte as u16) << 8;
+    result
+}
+
+fn adc(state: &mut Emulator6502, value: u8) -> () {
+    // TODO Determine if there'll be a carry
+    state.accumulator = state.accumulator + value + (state.carry_flag() as u8);
+    // TODO Set flags
+}
+
+fn adc_imm(state: &mut Emulator6502) -> () {
+    adc(state, state.memory[(state.pc + 1) as usize]);
+}
+
+fn and(state: &mut Emulator6502, value: u8) -> () {
+    state.accumulator = state.accumulator & value;
+    // TODO Set flags
+}
+
+fn and_imm(state: &mut Emulator6502) -> () {
+    and(state, state.memory[(state.pc + 1) as usize]);
 }
