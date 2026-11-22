@@ -1710,13 +1710,24 @@ impl Emulator6502 {
         self.psr & 1 == 1
     }
 
-    pub fn pcl(&self) -> u8 {
+    fn pcl(&self) -> u8 {
         (self.pc & 0x11111111) as u8
     }
 
-    pub fn pch(&self) -> u8 {
+    fn pch(&self) -> u8 {
         ((self.pc >> 8) & 0x11111111) as u8
     }
+
+    /// Making a function for this allows us to control access to memory (to implement things like actual read-only memory sections)
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        // TODO Will need to investigate which areas (if any) are actually read-only. For now, just pass it through.
+        self.memory[addr as usize] = value
+    }
+
+    pub fn read_memory(&self, addr: u16) -> u8 {
+        self.memory[addr as usize]
+    }
+
 }
 
 /// No-op! Does nothing!
