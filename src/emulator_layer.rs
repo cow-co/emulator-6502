@@ -1720,15 +1720,28 @@ impl Emulator6502 {
 }
 
 /// No-op! Does nothing!
+/// 
+/// Define this explicitly for two reasons:
+/// - The opcodes require a function to execute (and this is easier and safer than allowing them to have that field empty)
+/// - This allows us to potentially slot some debugging in here to run whenever we get a NOP
 fn nop(_state: &mut Emulator6502) -> () {
     
 }
 
+/// Fetches a byte from the given memory location in page zero.
+/// 
+/// Strictly, this is just an index directly into the `memory` array on the `state` object, so we could skip this,
+/// but having a function for it allows us to do debugging and other stuff.
 fn zero_page_value(state: &Emulator6502, addr: u8) -> u8 {
     state.memory[addr as usize]
 }
 
 /// Fetches a value from memory, via the indexed indirect addressing technique, which uses the X register.
+/// 
+/// Not to be confused with indirect indexed addressing!
+/// 
+/// Indexed indirect (pre-indexed) addressing basically constructs an "indexed" address from the second operand of the instruction, 
+/// plus the value in the X register. This then points to a location in memory which is where the *effective* address is stored.
 /// 
 /// `indexed_addr` should be *without* the X register added (this function takes care of that internally)
 fn indexed_indirect_value(state: &Emulator6502, indexed_addr: u8) -> u8 {
@@ -1736,6 +1749,21 @@ fn indexed_indirect_value(state: &Emulator6502, indexed_addr: u8) -> u8 {
     let low_byte = zero_page_value(state, indirected);
     let high_byte = zero_page_value(state, indirected+1);
     let effective_addr = double_byte_from_two_single_bytes(low_byte, high_byte);
+    state.memory[effective_addr as usize]
+}
+
+/// Fetches a value from memory, via the indirect indexed addressing technique, which uses the Y register.
+/// 
+/// Not to be confused with indexed indirect addressing!
+/// 
+/// With indirect indexed (post-indexed) addressing, we take the second operand of the instruction, use that as a pointer to 
+/// where the indirect address is stored (in page 0); once that address is fetched, we index (add) it with the value stored in the 
+/// Y register, and use the result as our effective address to retrieve our final output.
+fn indirect_indexed_value(state: &Emulator6502, addr: u8) -> u8 {
+    let low_byte = zero_page_value(state, addr);
+    let high_byte = zero_page_value(state, addr+1);
+    let indirect_addr = double_byte_from_two_single_bytes(low_byte, high_byte);
+    let effective_addr = indirect_addr + state.idx_y as u16;
     state.memory[effective_addr as usize]
 }
 
