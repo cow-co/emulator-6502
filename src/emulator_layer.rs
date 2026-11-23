@@ -74,7 +74,7 @@ impl Emulator6502 {
                 // 0x08
                 Opcode {
                     op_cycles: 3,
-                    mnemonic: "PHP",
+                    op_func: php,
                 },
                 // 0x09
                 Opcode {
@@ -234,7 +234,7 @@ impl Emulator6502 {
                 // 0x28
                 Opcode {
                     op_cycles: 4,
-                    mnemonic: "PLP",
+                    op_func: plp,
                 },
                 // 0x29
                 Opcode {
@@ -394,7 +394,7 @@ impl Emulator6502 {
                 // 0x48
                 Opcode {
                     op_cycles: 3,
-                    mnemonic: "PHA",
+                    op_func: pha,
                 },
                 // 0x49
                 Opcode {
@@ -555,7 +555,7 @@ impl Emulator6502 {
                 // 0x68
                 Opcode {
                     op_cycles: 4,
-                    mnemonic: "PLA",
+                    op_func: pla,
                 },
                 // 0x69
                 Opcode {
@@ -1990,4 +1990,38 @@ fn cpy_absolute(state: &mut Emulator6502, disassemble: bool) {
         cpy(state, val);
     }
     state.pc = state.pc + 3;
+}
+
+// Stack Ops
+
+fn pha(state: &mut Emulator6502, disassemble: bool) {
+    if disassemble {
+        println!("{} PHA", state.pc);
+    }
+    // TODO IMPL
+    state.pc = state.pc + 1;
+}
+
+fn php(state: &mut Emulator6502, disassemble: bool) {
+    if disassemble {
+        println!("{} PHP", state.pc);
+    }
+    // TODO IMPL
+    state.pc = state.pc + 1;
+}
+
+fn pla(state: &mut Emulator6502, disassemble: bool) {
+    if disassemble {
+        println!("{} PLA", state.pc);
+    }
+    // TODO IMPL
+    state.pc = state.pc + 1;
+}
+
+fn plp(state: &mut Emulator6502, disassemble: bool) {
+    if disassemble {
+        println!("{} PLP", state.pc);
+    }
+    // TODO IMPL
+    state.pc = state.pc + 1;
 }
