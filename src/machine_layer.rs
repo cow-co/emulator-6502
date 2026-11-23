@@ -15,8 +15,8 @@ impl Machine2600 {
         
     }
 
-    pub fn run_machine(&self) {
-        self.processor.run_emulation();
+    pub fn run_machine(&self, with_disassembly: bool) {
+        self.processor.run_emulation(with_disassembly);
     }
 
     pub fn frame_buffer(&self) {
