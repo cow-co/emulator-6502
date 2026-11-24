@@ -838,7 +838,7 @@ impl CPU6502 {
             // 0xA1
             Opcode {
                 op_cycles: 6,
-                mnemonic: "LDA (${}, X)",
+                op_func: CPU6502::lda_indirect_x,
             },
             // 0xA2
             Opcode {
@@ -858,7 +858,7 @@ impl CPU6502 {
             // 0xA5
             Opcode {
                 op_cycles: 3,
-                mnemonic: "LDA ${}",
+                op_func: CPU6502::lda_zero_page,
             },
             // 0xA6
             Opcode {
@@ -878,7 +878,7 @@ impl CPU6502 {
             // 0xA9
             Opcode {
                 op_cycles: 2,
-                mnemonic: "LDA #{}",
+                op_func: CPU6502::lda_imm,
             },
             // 0xAA
             Opcode {
@@ -898,7 +898,7 @@ impl CPU6502 {
             // 0xAD
             Opcode {
                 op_cycles: 4,
-                mnemonic: "LDA ${}",
+                op_func: CPU6502::lda_absolute,
             },
             // 0xAE
             Opcode {
@@ -918,7 +918,7 @@ impl CPU6502 {
             // 0xB1
             Opcode {
                 op_cycles: 5,
-                mnemonic: "LDA (${}), Y",
+                op_func: CPU6502::lda_indirect_y,
             },
             // 0xB2
             Opcode {
@@ -938,7 +938,7 @@ impl CPU6502 {
             // 0xB5
             Opcode {
                 op_cycles: 4,
-                mnemonic: "LDA ${}, X",
+                op_func: CPU6502::lda_zero_page_x,
             },
             // 0xB6
             Opcode {
@@ -958,7 +958,7 @@ impl CPU6502 {
             // 0xB9
             Opcode {
                 op_cycles: 4,
-                mnemonic: "LDA ${}, Y",
+                op_func: CPU6502::lda_absolute_y,
             },
             // 0xBA
             Opcode {
@@ -978,7 +978,7 @@ impl CPU6502 {
             // 0xBD
             Opcode {
                 op_cycles: 4,
-                mnemonic: "LDA ${}, X",
+                op_func: CPU6502::lda_absolute_x,
             },
             // 0xBE
             Opcode {
@@ -2878,6 +2878,105 @@ impl CPU6502 {
             // TODO IMPL (Pull PC from stack - the increment by one belowthen puts PC where it should be)
         }
         self.pc += 1;
+    }
+
+    // Load/Store
+
+    /// Loads the given value into the accumulator.
+    /// 
+    /// Sets flags but does *not* set PC.
+    fn lda(&mut self, value: u8) {
+        // TODO Set flags
+        self.accumulator = value;
+    }
+
+    fn lda_imm(&mut self, disassemble: bool) {
+        let imm = self.read_memory(self.pc+1);
+        if disassemble {
+            println!("{} LDA #{}", self.pc, imm);
+        } else {
+            self.lda(imm);
+        }
+        self.pc += 2;
+    }
+
+    fn lda_zero_page(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc+1);
+        if disassemble {
+            println!("{} LDA ${}", self.pc, addr);
+        } else {
+            let value = self.read_memory(addr as u16);
+            self.lda(value);
+        }
+        self.pc += 2;
+    }
+
+    fn lda_zero_page_x(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc+1);
+        if disassemble {
+            println!("{} LDA ${}, X", self.pc, addr);
+        } else {
+            // TODO Check Impl
+        let value = self.read_memory((addr + self.idx_x) as u16);
+            self.lda(value);
+        }
+        self.pc += 2;
+    }
+
+    fn lda_absolute(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let addr = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} LDA ${}", self.pc, addr);
+        } else {
+            self.lda(self.read_memory(addr));
+        }
+        self.pc += 3;
+    }
+
+    fn lda_absolute_x(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let addr = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} LDA ${}, X", self.pc, addr);
+        } else {
+            self.lda(self.read_memory(addr + self.idx_x as u16));
+        }
+        self.pc += 3;
+    }
+
+    fn lda_absolute_y(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let addr = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} LDA ${}, X", self.pc, addr);
+        } else {
+            self.lda(self.read_memory(addr + self.idx_y as u16));
+        }
+        self.pc += 3;
+    }
+
+    fn lda_indirect_x(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc+1);
+        if disassemble {
+            println!("{} LDA (${}, X)", self.pc, addr);
+        } else {
+            // TODO IMPL
+        }
+        self.pc += 2;
+    }
+
+    fn lda_indirect_y(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc+1);
+        if disassemble {
+            println!("{} LDA (${}), Y", self.pc, addr);
+        } else {
+            // TODO IMPL
+        }
+        self.pc += 2;
     }
 
 }
