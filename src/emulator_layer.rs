@@ -114,7 +114,7 @@ impl CPU6502 {
             // 0x10
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BPL ${}",
+                op_func: CPU6502::bpl,
             },
             // 0x11
             Opcode {
@@ -194,7 +194,7 @@ impl CPU6502 {
             // 0x20
             Opcode {
                 op_cycles: 6,
-                mnemonic: "JSR ${}",
+                op_func: CPU6502::jsr,
             },
             // 0x21
             Opcode {
@@ -274,7 +274,7 @@ impl CPU6502 {
             // 0x30
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BMI ${}",
+                op_func: CPU6502::bmi,
             },
             // 0x31
             Opcode {
@@ -354,7 +354,7 @@ impl CPU6502 {
             // 0x40
             Opcode {
                 op_cycles: 6,
-                mnemonic: "RTI",
+                op_func: CPU6502::rti,
             },
             // 0x41
             Opcode {
@@ -414,7 +414,7 @@ impl CPU6502 {
             // 0x4C
             Opcode {
                 op_cycles: 3,
-                mnemonic: "JMP ${}",
+                op_func: CPU6502::jmp_absolute,
             },
             // 0x4D
             Opcode {
@@ -434,7 +434,7 @@ impl CPU6502 {
             // 0x50
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BVC ${}",
+                op_func: CPU6502::bvc,
             },
             // 0x51
             Opcode {
@@ -514,7 +514,7 @@ impl CPU6502 {
             // 0x60
             Opcode {
                 op_cycles: 6,
-                mnemonic: "RTS",
+                op_func: CPU6502::rts,
             },
             // 0x61
             Opcode {
@@ -573,7 +573,7 @@ impl CPU6502 {
             // 0x6C
             Opcode {
                 op_cycles: 5,
-                mnemonic: "JMP (${})",
+                op_func: CPU6502::jmp_indirect,
             },
             // 0x6D
             Opcode {
@@ -593,7 +593,7 @@ impl CPU6502 {
             // 0x70
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BVS ${}",
+                op_func: CPU6502::bvs,
             },
             // 0x71
             Opcode {
@@ -753,7 +753,7 @@ impl CPU6502 {
             // 0x90
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BCC ${}",
+                op_func: CPU6502::bcc,
             },
             // 0x91
             Opcode {
@@ -913,7 +913,7 @@ impl CPU6502 {
             // 0xB0
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BCS ${}",
+                op_func: CPU6502::bcs,
             },
             // 0xB1
             Opcode {
@@ -1073,7 +1073,7 @@ impl CPU6502 {
             // 0xD0
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BNE ${}",
+                op_func: CPU6502::bne,
             },
             // 0xD1
             Opcode {
@@ -1233,7 +1233,7 @@ impl CPU6502 {
             // 0xF0
             Opcode {
                 op_cycles: 2,
-                mnemonic: "BEQ ${}",
+                op_func: CPU6502::beq,
             },
             // 0xF1
             Opcode {
@@ -2731,6 +2731,153 @@ impl CPU6502 {
             }
         }
         self.pc += 3;
+    }
+
+    // Branches/Jumps
+    fn branch(&mut self, relative_addr: u8) {
+        // TODO IMPL
+    }
+
+    fn bcc(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BCC ${}", self.pc, addr);
+            self.pc += 2;
+        } else if !self.carry_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bcs(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BCS ${}", self.pc, addr);
+            self.pc += 2;
+        } else if self.carry_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn beq(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BEQ ${}", self.pc, addr);
+            self.pc += 2;
+        } else if self.zero_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bmi(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BMI ${}", self.pc, addr);
+            self.pc += 2;
+        } else if self.negative_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bne(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BNE ${}", self.pc, addr);
+            self.pc += 2;
+        } else if !self.zero_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bpl(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BPL ${}", self.pc, addr);
+            self.pc += 2;
+        } else if !self.negative_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bvc(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BVC ${}", self.pc, addr);
+            self.pc += 2;
+        } else if !self.overflow_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn bvs(&mut self, disassemble: bool) {
+        let addr = self.read_memory(self.pc + 1);
+        if disassemble {
+            println!("{} BVS ${}", self.pc, addr);
+            self.pc += 2;
+        } else if self.overflow_flag() {
+            self.branch(addr);
+        }
+    }
+
+    fn jmp(&mut self, addr: u16) {
+        self.pc = addr;
+    }
+
+    fn jmp_absolute(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let addr = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} JMP ${}", self.pc, addr);
+            self.pc += 3;
+        } else {
+            self.jmp(addr);
+        }
+    }
+
+    fn jmp_indirect(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let indirected = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} JMP (${})", self.pc, indirected);
+            self.pc += 3;
+        } else {
+            let addr_low = self.read_memory(indirected);
+            let addr_high = self.read_memory(indirected+1);
+            let addr = double_byte_from_two_single_bytes(addr_low, addr_high);
+            self.jmp(addr);
+        }
+    }
+
+    fn jsr(&mut self, disassemble: bool) {
+        let low = self.read_memory(self.pc + 1);
+        let high = self.read_memory(self.pc + 2);
+        let addr = double_byte_from_two_single_bytes(low, high);
+        if disassemble {
+            println!("{} JSR ${}", self.pc, addr);
+            self.pc += 3;
+        } else {
+            // TODO IMPL (save PC+2 onto stack)
+            self.jmp(addr);
+        }
+    }
+
+    fn rti(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} RTI", self.pc);
+            self.pc += 1;
+        } else {
+            // TODO IMPL (Pull PSR and PC from stack)
+        }
+    }
+
+    fn rts(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} RTS", self.pc);
+        } else {
+            // TODO IMPL (Pull PC from stack - the increment by one belowthen puts PC where it should be)
+        }
+        self.pc += 1;
     }
 
 }
