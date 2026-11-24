@@ -154,7 +154,7 @@ impl CPU6502 {
             // 0x18
             Opcode {
                 op_cycles: 2,
-                mnemonic: "CLC",
+                op_func: CPU6502::clc,
             },
             // 0x19
             Opcode {
@@ -314,7 +314,7 @@ impl CPU6502 {
             // 0x38
             Opcode {
                 op_cycles: 2,
-                mnemonic: "SEC",
+                op_func: CPU6502::sec,
             },
             // 0x39
             Opcode {
@@ -474,7 +474,7 @@ impl CPU6502 {
             // 0x58
             Opcode {
                 op_cycles: 2,
-                mnemonic: "CLI",
+                op_func: CPU6502::cli,
             },
             // 0x59
             Opcode {
@@ -633,7 +633,7 @@ impl CPU6502 {
             // 0x78
             Opcode {
                 op_cycles: 2,
-                mnemonic: "SEI",
+                op_func: CPU6502::sei,
             },
             // 0x79
             Opcode {
@@ -953,7 +953,7 @@ impl CPU6502 {
             // 0xB8
             Opcode {
                 op_cycles: 2,
-                mnemonic: "CLV",
+                op_func: CPU6502::clv,
             },
             // 0xB9
             Opcode {
@@ -1113,7 +1113,7 @@ impl CPU6502 {
             // 0xD8
             Opcode {
                 op_cycles: 2,
-                mnemonic: "CLD",
+                op_func: CPU6502::cld,
             },
             // 0xD9
             Opcode {
@@ -1273,7 +1273,7 @@ impl CPU6502 {
             // 0xF8
             Opcode {
                 op_cycles: 2,
-                mnemonic: "SED",
+                op_func: CPU6502::sed,
             },
             // 0xF9
             Opcode {
@@ -1331,40 +1331,40 @@ impl CPU6502 {
         self.memory[addr as usize]
     }
 
-    fn negative_flag(&self) -> bool {
-        (self.psr >> 7) & 1 == 1
-    }
-
-    fn overflow_flag(&self) -> bool {
-        (self.psr >> 6) & 1 == 1
-    }
-
-    fn break_flag(&self) -> bool {
-        (self.psr >> 4) & 1 == 1
-    }
-
-    fn decimal_flag(&self) -> bool {
-        (self.psr >> 3) & 1 == 1
-    }
-
-    fn interrupt_disable_flag(&self) -> bool {
-        (self.psr >> 2) & 1 == 1
-    }
-
-    fn zero_flag(&self) -> bool {
-        (self.psr >> 1) & 1 == 1
-    }
-
     fn carry_flag(&self) -> bool {
         self.psr & 1 == 1
     }
 
+    fn zero_flag(&self) -> bool {
+        self.psr & 0b00000010 > 0
+    }
+
+    fn interrupt_disable_flag(&self) -> bool {
+        self.psr & 0b00000100 > 0
+    }
+
+    fn decimal_flag(&self) -> bool {
+        self.psr & 0b00001000 > 0
+    }
+
+    fn break_flag(&self) -> bool {
+        self.psr & 0b00010000 > 0
+    }
+
+    fn overflow_flag(&self) -> bool {
+        self.psr & 0b01000000 > 0
+    }
+
+    fn negative_flag(&self) -> bool {
+        self.psr & 0b10000000 > 0
+    }
+
     fn pcl(&self) -> u8 {
-        (self.pc & 0x11111111) as u8
+        (self.pc & 0xFF) as u8
     }
 
     fn pch(&self) -> u8 {
-        ((self.pc >> 8) & 0x11111111) as u8
+        ((self.pc & 0xFF00) >> 8) as u8
     }
 
     fn assign_carry(&mut self, set: bool) {
@@ -1372,6 +1372,46 @@ impl CPU6502 {
             self.psr = self.psr | 1;
         } else {
             self.psr = self.psr & 0b11111110;
+        }
+    }
+
+    fn assign_zero(&mut self, set: bool) {
+        if set {
+            self.psr = self.psr | 2;
+        } else {
+            self.psr = self.psr & 0b11111101;
+        }
+    }
+
+    fn assign_interrupt(&mut self, set: bool) {
+        if set {
+            self.psr = self.psr | 4;
+        } else {
+            self.psr = self.psr & 0b11111011;
+        }
+    }
+
+    fn assign_decimal(&mut self, set: bool) {
+        if set {
+            self.psr = self.psr | 8;
+        } else {
+            self.psr = self.psr & 0b11110111;
+        }
+    }
+
+    fn assign_overflow(&mut self, set: bool) {
+        if set {
+            self.psr = self.psr | 64;
+        } else {
+            self.psr = self.psr & 0b11011111;
+        }
+    }
+
+    fn assign_negative(&mut self, set: bool) {
+        if set {
+            self.psr = self.psr | 128;
+        } else {
+            self.psr = self.psr & 0b01111111;
         }
     }
 
@@ -1419,6 +1459,71 @@ impl CPU6502 {
         if disassemble {
             println!("{} NOP", self.pc);
         }
+    }
+
+    // Flag interactions
+
+    fn clc(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} CLC", self.pc);
+        } else {
+            self.assign_carry(false);
+        }
+        self.pc += 1;
+    }
+
+    fn sec(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} SEC", self.pc);
+        } else {
+            self.assign_carry(true);
+        }
+        self.pc += 1;
+    }
+    
+    fn cld(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} CLD", self.pc);
+        } else {
+            self.assign_decimal(false);
+        }
+        self.pc += 1;
+    }
+
+    fn sed(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} SED", self.pc);
+        } else {
+            self.assign_decimal(true);
+        }
+        self.pc += 1;
+    }
+    
+    fn cli(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} CLI", self.pc);
+        } else {
+            self.assign_interrupt(false);
+        }
+        self.pc += 1;
+    }
+
+    fn sei(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} SEI", self.pc);
+        } else {
+            self.assign_interrupt(true);
+        }
+        self.pc += 1;
+    }
+    
+    fn clv(&mut self, disassemble: bool) {
+        if disassemble {
+            println!("{} CLV", self.pc);
+        } else {
+            self.assign_overflow(false);
+        }
+        self.pc += 1;
     }
 
     // ARITHMETIC
