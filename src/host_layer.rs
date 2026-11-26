@@ -1,8 +1,9 @@
-use crate::machine_layer::machine_state::Machine2600;
+use crate::machine_layer::MachineMissileCommand;
 
 pub fn run() {
-    let machine = Machine2600::new();
+    let mut machine = MachineMissileCommand::new();
+    machine.load_rom("cpu_diag.bin", 0);
     loop {
-        machine.run_machine();
+        machine.run_machine(true);
     }
 }

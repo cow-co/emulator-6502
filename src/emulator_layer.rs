@@ -559,6 +559,7 @@ impl CPU6502 {
             // 0x69
             Opcode {
                 op_cycles: 2,
+                op_func: CPU6502::adc_imm,
             },
             // 0x6A
             Opcode {
