@@ -1315,12 +1315,16 @@ impl CPU6502 {
         }
     }
 
-    pub fn run_instruction(self: &mut CPU6502, with_disassembly: bool) {
+    /// This is for external code to indirectly set the program counter; intended for use in cases where the 
+    /// executable is loaded into memory at a non-zero base address.
+    pub fn set_execution_address(&mut self, exec_addr: u16) {
+        self.pc = exec_addr;
+    }
+
+    pub fn run_instruction(&mut self, with_disassembly: bool) {
         let instr_byte = self.memory[self.pc as usize];
         (self.instructions[instr_byte as usize].op_func)(self, with_disassembly);
     }
-
-    pub fn load_binary() {}
 
     /// Making a function for this allows us to control access to memory (to implement things like actual read-only memory sections)
     pub fn write_memory(&mut self, addr: u16, value: u8) {

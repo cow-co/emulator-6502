@@ -20,6 +20,7 @@ impl MachineMissileCommand {
             self.processor.write_memory(start_addr+idx, *b);
             idx += 1;
         }
+        self.processor.set_execution_address(start_addr);
     }
 
     pub fn run_machine(&mut self, with_disassembly: bool) {
