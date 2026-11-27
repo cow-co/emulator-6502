@@ -1043,7 +1043,7 @@ impl CPU6502 {
             // 0xC9
             Opcode {
                 op_cycles: 2,
-                op_func: CPU6502::cmp_indirect_x,
+                op_func: CPU6502::cmp_imm,
             },
             // 0xCA
             Opcode {
@@ -1352,10 +1352,6 @@ impl CPU6502 {
         self.memory[addr as usize]
     }
 
-    pub fn pc(&self) -> u16 {
-        self.pc
-    }
-
     pub fn execution_complete(&self) -> bool {
         self.execution_complete
     }
@@ -1461,7 +1457,7 @@ impl CPU6502 {
     /// - This allows us to potentially slot some debugging in here to run whenever we get a NOP
     fn nop(&mut self, disassemble: bool) -> () {
         if disassemble {
-            println!("{} NOP", self.pc);
+            println!("{:#06x} NOP", self.pc);
         }
         self.inc_pc(1);
     }
@@ -1470,7 +1466,7 @@ impl CPU6502 {
 
     fn clc(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} CLC", self.pc);
+            println!("{:#06x} CLC", self.pc);
         } else {
             self.assign_carry(false);
         }
@@ -1479,7 +1475,7 @@ impl CPU6502 {
 
     fn sec(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} SEC", self.pc);
+            println!("{:#06x} SEC", self.pc);
         } else {
             self.assign_carry(true);
         }
@@ -1488,7 +1484,7 @@ impl CPU6502 {
     
     fn cld(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} CLD", self.pc);
+            println!("{:#06x} CLD", self.pc);
         } else {
             self.assign_decimal(false);
         }
@@ -1497,7 +1493,7 @@ impl CPU6502 {
 
     fn sed(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} SED", self.pc);
+            println!("{:#06x} SED", self.pc);
         } else {
             self.assign_decimal(true);
         }
@@ -1506,7 +1502,7 @@ impl CPU6502 {
     
     fn cli(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} CLI", self.pc);
+            println!("{:#06x} CLI", self.pc);
         } else {
             self.assign_interrupt(false);
         }
@@ -1515,7 +1511,7 @@ impl CPU6502 {
 
     fn sei(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} SEI", self.pc);
+            println!("{:#06x} SEI", self.pc);
         } else {
             self.assign_interrupt(true);
         }
@@ -1524,7 +1520,7 @@ impl CPU6502 {
     
     fn clv(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} CLV", self.pc);
+            println!("{:#06x} CLV", self.pc);
         } else {
             self.assign_overflow(false);
         }
@@ -1545,7 +1541,7 @@ impl CPU6502 {
     fn adc_imm(&mut self, disassemble: bool) -> () {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ADC #{}", self.pc, imm);
+            println!("{:#06x} ADC #{:#04x}", self.pc, imm);
         } else {
             self.adc(imm);
         }
@@ -1556,7 +1552,7 @@ impl CPU6502 {
     fn adc_zero_page(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ADC ${}", self.pc, addr);
+            println!("{:#06x} ADC ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.adc(val);
@@ -1567,7 +1563,7 @@ impl CPU6502 {
     fn adc_zero_page_x(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ADC ${}, X", self.pc, addr);
+            println!("{:#06x} ADC ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.adc(val);
@@ -1580,7 +1576,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ADC ${}", self.pc, addr);
+            println!("{:#06x} ADC ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.adc(val);
@@ -1593,7 +1589,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ADC ${}, X", self.pc, addr);
+            println!("{:#06x} ADC ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.adc(val);
@@ -1606,7 +1602,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ADC ${}, Y", self.pc, addr);
+            println!("{:#06x} ADC ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.adc(val);
@@ -1617,7 +1613,7 @@ impl CPU6502 {
     fn adc_indirect_x(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ADC (${}, X)", self.pc, addr);
+            println!("{:#06x} ADC (${}, X)", self.pc, addr);
         } else {
             // TODO IMPL
             let val = self.read_memory((addr + self.idx_x) as u16);
@@ -1629,7 +1625,7 @@ impl CPU6502 {
     fn adc_indirect_y(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ADC (${}), Y", self.pc, addr);
+            println!("{:#06x} ADC (${}), Y", self.pc, addr);
         } else {
             // TODO IMPL
             let val = self.read_memory((addr + self.idx_x) as u16);
@@ -1649,7 +1645,7 @@ impl CPU6502 {
     fn dec_zero_page(&mut self, disassemble: bool) {
         let addr: u8 = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} DEC ${}", self.pc, addr);
+            println!("{:#06x} DEC ${:#04x}", self.pc, addr);
         } else {
             self.dec(addr as u16);
         }
@@ -1659,7 +1655,7 @@ impl CPU6502 {
     fn dec_zero_page_x(&mut self, disassemble: bool) {
         let addr: u8 = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} DEC ${}, X", self.pc, addr);
+            println!("{:#06x} DEC ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             self.dec(effective);
@@ -1672,7 +1668,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} DEC ${}", self.pc, addr);
+            println!("{:#06x} DEC ${:#04x}", self.pc, addr);
         } else {
             self.dec(addr);
         }
@@ -1684,7 +1680,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} DEC ${}, X", self.pc, addr);
+            println!("{:#06x} DEC ${}, X", self.pc, addr);
         } else {
             self.dec(addr + self.idx_x as u16);
         }
@@ -1693,7 +1689,7 @@ impl CPU6502 {
 
     fn dex(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} DEX", self.pc);
+            println!("{:#06x} DEX", self.pc);
         } else {
             self.idx_x -= 1;
         }
@@ -1702,7 +1698,7 @@ impl CPU6502 {
 
     fn dey(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} DEY", self.pc);
+            println!("{:#06x} DEY", self.pc);
         } else {
             self.idx_y -= 1;
         }
@@ -1720,7 +1716,7 @@ impl CPU6502 {
     fn inc_zero_page(&mut self, disassemble: bool) {
         let addr: u8 = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} INC ${}", self.pc, addr);
+            println!("{:#06x} INC ${:#04x}", self.pc, addr);
         } else {
             self.inc(addr as u16);
         }
@@ -1730,7 +1726,7 @@ impl CPU6502 {
     fn inc_zero_page_x(&mut self, disassemble: bool) {
         let addr: u8 = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} INC ${}, X", self.pc, addr);
+            println!("{:#06x} INC ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             self.inc(effective);
@@ -1743,7 +1739,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} INC ${}", self.pc, addr);
+            println!("{:#06x} INC ${:#04x}", self.pc, addr);
         } else {
             self.inc(addr);
         }
@@ -1755,7 +1751,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} INC ${}, X", self.pc, addr);
+            println!("{:#06x} INC ${}, X", self.pc, addr);
         } else {
             self.inc(addr + self.idx_x as u16);
         }
@@ -1764,7 +1760,7 @@ impl CPU6502 {
 
     fn inx(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} INX", self.pc);
+            println!("{:#06x} INX", self.pc);
         } else {
             self.idx_x += 1;
         }
@@ -1773,7 +1769,7 @@ impl CPU6502 {
 
     fn iny(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} INY", self.pc);
+            println!("{:#06x} INY", self.pc);
         } else {
             self.idx_y += 1;
         }
@@ -1792,7 +1788,7 @@ impl CPU6502 {
     fn sbc_imm(&mut self, disassemble: bool) -> () {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} SBC #{}", self.pc, imm);
+            println!("{:#06x} SBC #{:#04x}", self.pc, imm);
         } else {
             self.sbc(imm);
         }
@@ -1803,7 +1799,7 @@ impl CPU6502 {
     fn sbc_zero_page(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} SBC ${}", self.pc, addr);
+            println!("{:#06x} SBC ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.sbc(val);
@@ -1814,7 +1810,7 @@ impl CPU6502 {
     fn sbc_zero_page_x(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} SBC ${}, X", self.pc, addr);
+            println!("{:#06x} SBC ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.sbc(val);
@@ -1827,7 +1823,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} SBC ${}", self.pc, addr);
+            println!("{:#06x} SBC ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.sbc(val);
@@ -1840,7 +1836,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} SBC ${}, X", self.pc, addr);
+            println!("{:#06x} SBC ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.sbc(val);
@@ -1853,7 +1849,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} SBC ${}, Y", self.pc, addr);
+            println!("{:#06x} SBC ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.sbc(val);
@@ -1864,7 +1860,7 @@ impl CPU6502 {
     fn sbc_indirect_x(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} SBC (${}, X)", self.pc, addr);
+            println!("{:#06x} SBC (${}, X)", self.pc, addr);
         } else {
             // TODO IMPL
             let val = self.read_memory((addr + self.idx_x) as u16);
@@ -1876,7 +1872,7 @@ impl CPU6502 {
     fn sbc_indirect_y(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} SBC (${}), Y", self.pc, addr);
+            println!("{:#06x} SBC (${}), Y", self.pc, addr);
         } else {
             // TODO IMPL
             let val = self.read_memory((addr + self.idx_x) as u16);
@@ -1899,7 +1895,7 @@ impl CPU6502 {
     fn and_imm(&mut self, disassemble: bool) -> () {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} AND #{}", self.pc, imm);
+            println!("{:#06x} AND #{:#04x}", self.pc, imm);
         } else {
             self.and(imm);
         }
@@ -1909,7 +1905,7 @@ impl CPU6502 {
     fn and_zero_page(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} AND ${}", self.pc, addr);
+            println!("{:#06x} AND ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.and(val);
@@ -1920,7 +1916,7 @@ impl CPU6502 {
     fn and_zero_page_x(&mut self, disassemble: bool) -> () {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} AND ${}, X", self.pc, addr);
+            println!("{:#06x} AND ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.and(val);
@@ -1933,7 +1929,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} AND ${}", self.pc, addr);
+            println!("{:#06x} AND ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.and(val);
@@ -1946,7 +1942,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} AND ${}, X", self.pc, addr);
+            println!("{:#06x} AND ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.and(val);
@@ -1959,7 +1955,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} AND ${}, Y", self.pc, addr);
+            println!("{:#06x} AND ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.and(val);
@@ -1973,7 +1969,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} AND (${}, X)", self.pc, addr);
+            println!("{:#06x} AND (${}, X)", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.and(val);
@@ -1987,7 +1983,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} AND (${}), Y", self.pc, addr);
+            println!("{:#06x} AND (${}), Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.and(val);
@@ -2006,7 +2002,7 @@ impl CPU6502 {
     fn ora_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ORA #{}", self.pc, imm);
+            println!("{:#06x} ORA #{:#04x}", self.pc, imm);
         } else {
             self.ora(imm);
         }
@@ -2016,7 +2012,7 @@ impl CPU6502 {
     fn ora_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ORA ${}", self.pc, addr);
+            println!("{:#06x} ORA ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.ora(val);
@@ -2027,7 +2023,7 @@ impl CPU6502 {
     fn ora_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ORA ${}, X", self.pc, addr);
+            println!("{:#06x} ORA ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.ora(val);
@@ -2040,7 +2036,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ORA ${}", self.pc, addr);
+            println!("{:#06x} ORA ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.ora(val);
@@ -2053,7 +2049,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ORA ${}, X", self.pc, addr);
+            println!("{:#06x} ORA ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.ora(val);
@@ -2066,7 +2062,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ORA ${}, Y", self.pc, addr);
+            println!("{:#06x} ORA ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.ora(val);
@@ -2078,7 +2074,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ORA (${}, X)", self.pc, addr);
+            println!("{:#06x} ORA (${}, X)", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.ora(val);
@@ -2090,7 +2086,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ORA (${}), Y", self.pc, addr);
+            println!("{:#06x} ORA (${}), Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.ora(val);
@@ -2109,7 +2105,7 @@ impl CPU6502 {
     fn eor_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} EOR #{}", self.pc, imm);
+            println!("{:#06x} EOR #{:#04x}", self.pc, imm);
         } else {
             self.eor(imm);
         }
@@ -2119,7 +2115,7 @@ impl CPU6502 {
     fn eor_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} EOR ${}", self.pc, addr);
+            println!("{:#06x} EOR ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.eor(val);
@@ -2130,7 +2126,7 @@ impl CPU6502 {
     fn eor_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} EOR ${}, X", self.pc, addr);
+            println!("{:#06x} EOR ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.eor(val);
@@ -2143,7 +2139,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} EOR ${}", self.pc, addr);
+            println!("{:#06x} EOR ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.eor(val);
@@ -2156,7 +2152,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} EOR ${}, X", self.pc, addr);
+            println!("{:#06x} EOR ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.eor(val);
@@ -2169,7 +2165,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} EOR ${}, Y", self.pc, addr);
+            println!("{:#06x} EOR ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.eor(val);
@@ -2181,7 +2177,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} EOR (${}, X)", self.pc, addr);
+            println!("{:#06x} EOR (${}, X)", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.eor(val);
@@ -2193,7 +2189,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} EOR (${}), Y", self.pc, addr);
+            println!("{:#06x} EOR (${}), Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.eor(val);
@@ -2206,7 +2202,7 @@ impl CPU6502 {
 
     fn brk(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} BRK", self.pc);
+            println!("{:#06x} BRK", self.pc);
         } else {
             // TODO IMPL
         }
@@ -2223,7 +2219,7 @@ impl CPU6502 {
     fn bit_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BIT ${}", self.pc, addr);
+            println!("{:#06x} BIT ${:#04x}", self.pc, addr);
         } else {
             self.bit(self.read_memory(addr as u16));
         }
@@ -2235,7 +2231,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} BIT ${}", self.pc, addr);
+            println!("{:#06x} BIT ${:#04x}", self.pc, addr);
         } else {
             self.bit(self.read_memory(addr));
         }
@@ -2255,7 +2251,7 @@ impl CPU6502 {
     fn cmp_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CMP #{}", self.pc, imm);
+            println!("{:#06x} CMP #{:#04x}", self.pc, imm);
         } else {
             self.cmp(imm);
         }
@@ -2265,7 +2261,7 @@ impl CPU6502 {
     fn cmp_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CMP ${}", self.pc, addr);
+            println!("{:#06x} CMP ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
@@ -2276,7 +2272,7 @@ impl CPU6502 {
     fn cmp_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CMP ${}, X", self.pc, addr);
+            println!("{:#06x} CMP ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.cmp(val);
@@ -2289,7 +2285,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} CMP ${}", self.pc, addr);
+            println!("{:#06x} CMP ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.cmp(val);
@@ -2302,7 +2298,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} CMP ${}, X", self.pc, addr);
+            println!("{:#06x} CMP ${}, X", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.cmp(val);
@@ -2315,7 +2311,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} CMP ${}, Y", self.pc, addr);
+            println!("{:#06x} CMP ${}, Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.cmp(val);
@@ -2327,7 +2323,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CMP (${}, X)", self.pc, addr);
+            println!("{:#06x} CMP (${}, X)", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
@@ -2339,7 +2335,7 @@ impl CPU6502 {
         // TODO IMPL
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CMP (${}), Y", self.pc, addr);
+            println!("{:#06x} CMP (${}), Y", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
@@ -2358,7 +2354,7 @@ impl CPU6502 {
     fn cpx_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CPX #{}", self.pc, imm);
+            println!("{:#06x} CPX #{:#04x}", self.pc, imm);
         } else {
             self.cpx(imm);
         }
@@ -2368,7 +2364,7 @@ impl CPU6502 {
     fn cpx_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CPX ${}", self.pc, addr);
+            println!("{:#06x} CPX ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cpx(val);
@@ -2381,7 +2377,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} CPX ${}", self.pc, addr);
+            println!("{:#06x} CPX ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cpx(val);
@@ -2400,7 +2396,7 @@ impl CPU6502 {
     fn cpy_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CPY #{}", self.pc, imm);
+            println!("{:#06x} CPY #{:#04x}", self.pc, imm);
         } else {
             self.cpy(imm);
         }
@@ -2410,7 +2406,7 @@ impl CPU6502 {
     fn cpy_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} CPY ${}", self.pc, addr);
+            println!("{:#06x} CPY ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr as u16);
             self.cpy(val);
@@ -2423,7 +2419,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} CPY ${}", self.pc, addr);
+            println!("{:#06x} CPY ${:#04x}", self.pc, addr);
         } else {
             let val = self.read_memory(addr);
             self.cpy(val);
@@ -2435,7 +2431,7 @@ impl CPU6502 {
 
     fn pha(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} PHA", self.pc);
+            println!("{:#06x} PHA", self.pc);
         }
         // TODO IMPL
         self.inc_pc(1);
@@ -2443,7 +2439,7 @@ impl CPU6502 {
 
     fn php(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} PHP", self.pc);
+            println!("{:#06x} PHP", self.pc);
         }
         // TODO IMPL
         self.inc_pc(1);
@@ -2451,7 +2447,7 @@ impl CPU6502 {
 
     fn pla(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} PLA", self.pc);
+            println!("{:#06x} PLA", self.pc);
         }
         // TODO IMPL
         self.inc_pc(1);
@@ -2459,7 +2455,7 @@ impl CPU6502 {
 
     fn plp(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} PLP", self.pc);
+            println!("{:#06x} PLP", self.pc);
         }
         // TODO IMPL
         self.inc_pc(1);
@@ -2469,7 +2465,7 @@ impl CPU6502 {
 
     fn asl_a(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} ASL A", self.pc);
+            println!("{:#06x} ASL A", self.pc);
         } else {
             self.assign_carry(self.accumulator & 0b10000000 > 0);
             self.accumulator = self.accumulator << 1;
@@ -2480,7 +2476,7 @@ impl CPU6502 {
     fn asl_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ASL ${}", self.pc, addr);
+            println!("{:#06x} ASL ${:#04x}", self.pc, addr);
         } else {
             let effective = addr as u16;
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
@@ -2492,7 +2488,7 @@ impl CPU6502 {
     fn asl_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ASL ${}, X", self.pc, addr);
+            println!("{:#06x} ASL ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
@@ -2506,7 +2502,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ASL ${}", self.pc, addr);
+            println!("{:#06x} ASL ${:#04x}", self.pc, addr);
         } else {
             self.assign_carry(self.read_memory(addr) & 0b10000000 > 0);
             self.write_memory(addr, self.read_memory(addr) << 1);
@@ -2519,7 +2515,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ASL ${}, X", self.pc, addr);
+            println!("{:#06x} ASL ${}, X", self.pc, addr);
         } else {
             let effective = addr + self.idx_x as u16;
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
@@ -2530,7 +2526,7 @@ impl CPU6502 {
 
     fn lsr_a(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} LSR A", self.pc);
+            println!("{:#06x} LSR A", self.pc);
         } else {
             if self.accumulator & 1 > 0 {
                 self.assign_carry(true);
@@ -2543,7 +2539,7 @@ impl CPU6502 {
     fn lsr_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} LSR ${}", self.pc, addr);
+            println!("{:#06x} LSR ${:#04x}", self.pc, addr);
         } else {
             let effective = addr as u16;
             if self.read_memory(effective) & 1 > 0 {
@@ -2557,7 +2553,7 @@ impl CPU6502 {
     fn lsr_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} LSR ${}, X", self.pc, addr);
+            println!("{:#06x} LSR ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             if self.read_memory(effective) & 1 > 0 {
@@ -2573,7 +2569,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LSR ${}", self.pc, addr);
+            println!("{:#06x} LSR ${:#04x}", self.pc, addr);
         } else {
             if self.read_memory(addr) & 1 > 0 {
                 self.assign_carry(true);
@@ -2588,7 +2584,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LSR ${}, X", self.pc, addr);
+            println!("{:#06x} LSR ${}, X", self.pc, addr);
         } else {
             let effective = addr + self.idx_x as u16;
             if self.read_memory(effective) & 1 > 0 {
@@ -2601,7 +2597,7 @@ impl CPU6502 {
 
     fn rol_a(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} ROL A", self.pc);
+            println!("{:#06x} ROL A", self.pc);
         } else {
             let should_set_carry = self.accumulator & 1 > 0;
             self.accumulator = self.accumulator << 1;
@@ -2618,7 +2614,7 @@ impl CPU6502 {
     fn rol_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ROL ${}", self.pc, addr);
+            println!("{:#06x} ROL ${:#04x}", self.pc, addr);
         } else {
             let effective = addr as u16;
             let should_set_carry = self.read_memory(effective) & 1 > 0;
@@ -2636,7 +2632,7 @@ impl CPU6502 {
     fn rol_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ROL ${}, X", self.pc, addr);
+            println!("{:#06x} ROL ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             let should_set_carry = self.read_memory(effective) & 1 > 0;
@@ -2656,7 +2652,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ROL ${}", self.pc, addr);
+            println!("{:#06x} ROL ${:#04x}", self.pc, addr);
         } else {
             let should_set_carry = self.read_memory(addr) & 1 > 0;
             self.write_memory(addr, self.read_memory(addr) << 1);
@@ -2675,7 +2671,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ROL ${}, X", self.pc, addr);
+            println!("{:#06x} ROL ${}, X", self.pc, addr);
         } else {
             let effective = addr + self.idx_x as u16;
             let should_set_carry = self.read_memory(effective as u16) & 1 > 0;
@@ -2692,7 +2688,7 @@ impl CPU6502 {
 
     fn ror_a(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} ROR A", self.pc);
+            println!("{:#06x} ROR A", self.pc);
         } else {
             let should_set_carry = self.accumulator & 1 > 0;
             self.accumulator = self.accumulator >> 1;
@@ -2709,7 +2705,7 @@ impl CPU6502 {
     fn ror_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ROR ${}", self.pc, addr);
+            println!("{:#06x} ROR ${:#04x}", self.pc, addr);
         } else {
             let should_set_carry = self.read_memory(addr as u16) & 1 > 0;
             self.write_memory(addr as u16, self.read_memory(addr as u16) >> 1);
@@ -2726,7 +2722,7 @@ impl CPU6502 {
     fn ror_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} ROR ${}, X", self.pc, addr);
+            println!("{:#06x} ROR ${}, X", self.pc, addr);
         } else {
             let effective = (addr + self.idx_x) as u16;
             let should_set_carry = self.read_memory(effective) & 1 > 0;
@@ -2746,7 +2742,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ROR ${}", self.pc, addr);
+            println!("{:#06x} ROR ${:#04x}", self.pc, addr);
         } else {
             let effective = addr as u16;
             let should_set_carry = self.read_memory(effective) & 1 > 0;
@@ -2766,7 +2762,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} ROR ${}, X", self.pc, addr);
+            println!("{:#06x} ROR ${}, X", self.pc, addr);
         } else {
             let effective = addr + self.idx_x as u16;
             let should_set_carry = self.read_memory(effective) & 1 > 0;
@@ -2789,7 +2785,7 @@ impl CPU6502 {
     fn bcc(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BCC ${}", self.pc, addr);
+            println!("{:#06x} BCC ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if !self.carry_flag() {
             self.branch(addr);
@@ -2799,7 +2795,7 @@ impl CPU6502 {
     fn bcs(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BCS ${}", self.pc, addr);
+            println!("{:#06x} BCS ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if self.carry_flag() {
             self.branch(addr);
@@ -2809,7 +2805,7 @@ impl CPU6502 {
     fn beq(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BEQ ${}", self.pc, addr);
+            println!("{:#06x} BEQ ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if self.zero_flag() {
             self.branch(addr);
@@ -2819,7 +2815,7 @@ impl CPU6502 {
     fn bmi(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BMI ${}", self.pc, addr);
+            println!("{:#06x} BMI ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if self.negative_flag() {
             self.branch(addr);
@@ -2829,7 +2825,7 @@ impl CPU6502 {
     fn bne(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BNE ${}", self.pc, addr);
+            println!("{:#06x} BNE ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if !self.zero_flag() {
             self.branch(addr);
@@ -2839,7 +2835,7 @@ impl CPU6502 {
     fn bpl(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BPL ${}", self.pc, addr);
+            println!("{:#06x} BPL ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if !self.negative_flag() {
             self.branch(addr);
@@ -2849,7 +2845,7 @@ impl CPU6502 {
     fn bvc(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BVC ${}", self.pc, addr);
+            println!("{:#06x} BVC ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if !self.overflow_flag() {
             self.branch(addr);
@@ -2859,7 +2855,7 @@ impl CPU6502 {
     fn bvs(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
-            println!("{} BVS ${}", self.pc, addr);
+            println!("{:#06x} BVS ${:#04x}", self.pc, addr);
             self.inc_pc(2);
         } else if self.overflow_flag() {
             self.branch(addr);
@@ -2875,7 +2871,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} JMP ${}", self.pc, addr);
+            println!("{:#06x} JMP ${:#04x}", self.pc, addr);
             self.inc_pc(3);
         } else {
             self.jmp(addr);
@@ -2887,7 +2883,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let indirected = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} JMP (${})", self.pc, indirected);
+            println!("{:#06x} JMP (${})", self.pc, indirected);
             self.inc_pc(3);
         } else {
             let addr_low = self.read_memory(indirected);
@@ -2902,7 +2898,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} JSR ${}", self.pc, addr);
+            println!("{:#06x} JSR ${:#04x}", self.pc, addr);
             self.inc_pc(3);
         } else {
             // TODO IMPL (save PC+2 onto stack)
@@ -2912,7 +2908,7 @@ impl CPU6502 {
 
     fn rti(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} RTI", self.pc);
+            println!("{:#06x} RTI", self.pc);
             self.inc_pc(1);
         } else {
             // TODO IMPL (Pull PSR and PC from stack)
@@ -2921,7 +2917,7 @@ impl CPU6502 {
 
     fn rts(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} RTS", self.pc);
+            println!("{:#06x} RTS", self.pc);
         } else {
             // TODO IMPL (Pull PC from stack - the increment by one belowthen puts PC where it should be)
         }
@@ -2978,7 +2974,7 @@ impl CPU6502 {
     fn lda_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDA #{}", self.pc, imm);
+            println!("{:#06x} LDA #{:#04x}", self.pc, imm);
         } else {
             self.lda(imm);
         }
@@ -2988,7 +2984,7 @@ impl CPU6502 {
     fn lda_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDA ${}", self.pc, addr);
+            println!("{:#06x} LDA ${:#04x}", self.pc, addr);
         } else {
             let value = self.read_memory(addr as u16);
             self.lda(value);
@@ -2999,7 +2995,7 @@ impl CPU6502 {
     fn lda_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDA ${}, X", self.pc, addr);
+            println!("{:#06x} LDA ${}, X", self.pc, addr);
         } else {
             // TODO Check Impl
             let value = self.read_memory((addr + self.idx_x) as u16);
@@ -3013,7 +3009,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDA ${}", self.pc, addr);
+            println!("{:#06x} LDA ${:#04x}", self.pc, addr);
         } else {
             self.lda(self.read_memory(addr));
         }
@@ -3025,7 +3021,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDA ${}, X", self.pc, addr);
+            println!("{:#06x} LDA ${}, X", self.pc, addr);
         } else {
             self.lda(self.read_memory(addr + self.idx_x as u16));
         }
@@ -3037,7 +3033,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDA ${}, X", self.pc, addr);
+            println!("{:#06x} LDA ${}, X", self.pc, addr);
         } else {
             self.lda(self.read_memory(addr + self.idx_y as u16));
         }
@@ -3047,7 +3043,7 @@ impl CPU6502 {
     fn lda_indirect_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDA (${}, X)", self.pc, addr);
+            println!("{:#06x} LDA (${}, X)", self.pc, addr);
         } else {
             // TODO IMPL
         }
@@ -3057,7 +3053,7 @@ impl CPU6502 {
     fn lda_indirect_y(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDA (${}), Y", self.pc, addr);
+            println!("{:#06x} LDA (${}), Y", self.pc, addr);
         } else {
             // TODO IMPL
         }
@@ -3067,7 +3063,7 @@ impl CPU6502 {
     fn ldx_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDX #{}", self.pc, imm);
+            println!("{:#06x} LDX #{:#04x}", self.pc, imm);
         } else {
             self.ldx(imm);
         }
@@ -3077,7 +3073,7 @@ impl CPU6502 {
     fn ldx_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDX ${}", self.pc, addr);
+            println!("{:#06x} LDX ${:#04x}", self.pc, addr);
         } else {
             let value = self.read_memory(addr as u16);
             self.ldx(value);
@@ -3088,7 +3084,7 @@ impl CPU6502 {
     fn ldx_zero_page_y(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDX ${}, Y", self.pc, addr);
+            println!("{:#06x} LDX ${}, Y", self.pc, addr);
         } else {
             // TODO Check Impl
         let value = self.read_memory((addr + self.idx_y) as u16);
@@ -3102,7 +3098,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDX ${}", self.pc, addr);
+            println!("{:#06x} LDX ${:#04x}", self.pc, addr);
         } else {
             self.ldx(self.read_memory(addr));
         }
@@ -3114,7 +3110,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDX ${}, Y", self.pc, addr);
+            println!("{:#06x} LDX ${}, Y", self.pc, addr);
         } else {
             self.ldx(self.read_memory(addr + self.idx_y as u16));
         }
@@ -3124,7 +3120,7 @@ impl CPU6502 {
     fn ldy_imm(&mut self, disassemble: bool) {
         let imm = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDY #{}", self.pc, imm);
+            println!("{:#06x} LDY #{:#04x}", self.pc, imm);
         } else {
             self.ldy(imm);
         }
@@ -3134,7 +3130,7 @@ impl CPU6502 {
     fn ldy_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDY ${}", self.pc, addr);
+            println!("{:#06x} LDY ${:#04x}", self.pc, addr);
         } else {
             let value = self.read_memory(addr as u16);
             self.ldy(value);
@@ -3145,7 +3141,7 @@ impl CPU6502 {
     fn ldy_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} LDY ${}, Y", self.pc, addr);
+            println!("{:#06x} LDY ${}, Y", self.pc, addr);
         } else {
             // TODO Check Impl
             let value = self.read_memory((addr + self.idx_x) as u16);
@@ -3159,7 +3155,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDY ${}", self.pc, addr);
+            println!("{:#06x} LDY ${:#04x}", self.pc, addr);
         } else {
             self.ldy(self.read_memory(addr));
         }
@@ -3171,7 +3167,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} LDY ${}, X", self.pc, addr);
+            println!("{:#06x} LDY ${}, X", self.pc, addr);
         } else {
             self.ldy(self.read_memory(addr + self.idx_x as u16));
         }
@@ -3181,7 +3177,7 @@ impl CPU6502 {
     fn sta_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STA ${}", self.pc, addr);
+            println!("{:#06x} STA ${:#04x}", self.pc, addr);
         } else {
             self.sta(addr as u16);
         }
@@ -3191,7 +3187,7 @@ impl CPU6502 {
     fn sta_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STA ${}, X", self.pc, addr);
+            println!("{:#06x} STA ${}, X", self.pc, addr);
         } else {
             // TODO Check Impl
             self.sta((addr + self.idx_x) as u16);
@@ -3204,7 +3200,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} STA ${}", self.pc, addr);
+            println!("{:#06x} STA ${:#04x}", self.pc, addr);
         } else {
             self.sta(addr);
         }
@@ -3216,7 +3212,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} STA ${}, X", self.pc, addr);
+            println!("{:#06x} STA ${}, X", self.pc, addr);
         } else {
             // TODO Check impl
             self.sta(addr + self.idx_x as u16);
@@ -3229,7 +3225,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} STA ${}, X", self.pc, addr);
+            println!("{:#06x} STA ${}, X", self.pc, addr);
         } else {
             // TODO Check impl
             self.sta(addr + self.idx_y as u16);
@@ -3240,7 +3236,7 @@ impl CPU6502 {
     fn sta_indirect_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STA (${}, X)", self.pc, addr);
+            println!("{:#06x} STA (${}, X)", self.pc, addr);
         } else {
             // TODO IMPL
         }
@@ -3250,7 +3246,7 @@ impl CPU6502 {
     fn sta_indirect_y(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STA (${}), Y", self.pc, addr);
+            println!("{:#06x} STA (${}), Y", self.pc, addr);
         } else {
             // TODO IMPL
         }
@@ -3260,7 +3256,7 @@ impl CPU6502 {
     fn stx_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STX ${}", self.pc, addr);
+            println!("{:#06x} STX ${:#04x}", self.pc, addr);
         } else {
             self.stx(addr as u16);
         }
@@ -3270,7 +3266,7 @@ impl CPU6502 {
     fn stx_zero_page_y(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STX ${}, Y", self.pc, addr);
+            println!("{:#06x} STX ${}, Y", self.pc, addr);
         } else {
             // TODO Check Impl
             self.stx((addr + self.idx_y) as u16);
@@ -3283,7 +3279,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} STX ${}", self.pc, addr);
+            println!("{:#06x} STX ${:#04x}", self.pc, addr);
         } else {
             self.stx(addr);
         }
@@ -3293,7 +3289,7 @@ impl CPU6502 {
     fn sty_zero_page(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STY ${}", self.pc, addr);
+            println!("{:#06x} STY ${:#04x}", self.pc, addr);
         } else {
             self.sty(addr as u16);
         }
@@ -3303,7 +3299,7 @@ impl CPU6502 {
     fn sty_zero_page_x(&mut self, disassemble: bool) {
         let addr = self.read_memory(self.pc+1);
         if disassemble {
-            println!("{} STY ${}, X", self.pc, addr);
+            println!("{:#06x} STY ${}, X", self.pc, addr);
         } else {
             // TODO Check Impl
             self.sty((addr + self.idx_x) as u16);
@@ -3316,7 +3312,7 @@ impl CPU6502 {
         let high = self.read_memory(self.pc + 2);
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
-            println!("{} STY ${}", self.pc, addr);
+            println!("{:#06x} STY ${:#04x}", self.pc, addr);
         } else {
             self.sty(addr);
         }
@@ -3325,7 +3321,7 @@ impl CPU6502 {
 
     fn tax(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TAX", self.pc);
+            println!("{:#06x} TAX", self.pc);
         } else {
             self.idx_x = self.accumulator;
         }
@@ -3334,7 +3330,7 @@ impl CPU6502 {
 
     fn tay(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TAY", self.pc);
+            println!("{:#06x} TAY", self.pc);
         } else {
             self.idx_y = self.accumulator;
         }
@@ -3343,7 +3339,7 @@ impl CPU6502 {
 
     fn tya(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TYA", self.pc);
+            println!("{:#06x} TYA", self.pc);
         } else {
             self.accumulator = self.idx_y;
         }
@@ -3352,7 +3348,7 @@ impl CPU6502 {
 
     fn tsx(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TSX", self.pc);
+            println!("{:#06x} TSX", self.pc);
         } else {
             self.idx_x = self.sp;
         }
@@ -3361,7 +3357,7 @@ impl CPU6502 {
 
     fn txa(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TXA", self.pc);
+            println!("{:#06x} TXA", self.pc);
         } else {
             self.accumulator = self.idx_x;
         }
@@ -3370,7 +3366,7 @@ impl CPU6502 {
 
     fn txs(&mut self, disassemble: bool) {
         if disassemble {
-            println!("{} TXS", self.pc);
+            println!("{:#06x} TXS", self.pc);
         } else {
             self.sp = self.idx_x;
         }
