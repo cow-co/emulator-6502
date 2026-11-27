@@ -1352,8 +1352,8 @@ impl CPU6502 {
         self.memory[addr as usize]
     }
 
-    pub fn execution_complete(&self) -> bool {
-        self.execution_complete
+    pub fn execution_complete(&self, program_end_addr: u16) -> bool {
+        self.execution_complete || self.pc > program_end_addr
     }
 
     fn inc_pc(&mut self, amount: u16) {

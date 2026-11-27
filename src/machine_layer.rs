@@ -20,12 +20,12 @@ impl MachineMissileCommand {
         let bytes = read(rom_file).expect("ROM File could not be read!");
         self.rom_end_addr = self.processor.bulk_write_memory(start_addr, &bytes);
         self.processor.set_execution_address(start_addr);
-        println!("{} bytes of ROM loaded, starting at address {}...", bytes.len(), start_addr);
+        println!("{:#06x} bytes of ROM loaded, starting at address {:#06x}...", bytes.len(), start_addr);
     }
 
     pub fn run_machine(&mut self, with_disassembly: bool) {
-        println!("Running processor until address {}...", self.rom_end_addr);
-        while !self.processor.execution_complete() {
+        println!("Running processor until address {:#06x}...", self.rom_end_addr);
+        while !self.processor.execution_complete(self.rom_end_addr as u16) {
             self.processor.run_instruction(with_disassembly);
         }
     }
