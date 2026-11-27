@@ -1,3 +1,5 @@
+use std::range;
+
 pub struct Opcode {
     op_cycles: u8, // Important in allowing us to run the emulator at the correct speed
     /// The `bool` is to denote whether we are in disassemble mode 
@@ -12,7 +14,8 @@ pub struct CPU6502 {
     idx_y: u8, // Index Y register for indirect addressing
     pc: u16, // Program counter; strictly, this was actually formed from two 8-bit registers (PCH and PCL)
 
-    memory: [u8; 2 ^ 16], // The 650X series can address 65K of memory
+    memory: [u8; 65536], // The 650X series can address 65K of memory
+    execution_complete: bool,
 
     // Various constants for the processor
     micros_per_cycle: u8,
@@ -28,7 +31,8 @@ impl CPU6502 {
             idx_x: 0,
             idx_y: 0,
             pc: 0,
-            memory: [0; 2 ^ 16],
+            memory: [0; 65536],
+            execution_complete: false, 
             micros_per_cycle: 1, // The baseline 6502 was a 1 MHz processor
             instructions: [
             // 0x00
@@ -579,7 +583,7 @@ impl CPU6502 {
             // 0x6D
             Opcode {
                 op_cycles: 4,
-                op_func: CPU6502::adc_imm,
+                op_func: CPU6502::adc_absolute,
             },
             // 0x6E
             Opcode {
@@ -1329,11 +1333,39 @@ impl CPU6502 {
     /// Making a function for this allows us to control access to memory (to implement things like actual read-only memory sections)
     pub fn write_memory(&mut self, addr: u16, value: u8) {
         // TODO Will need to investigate which areas (if any) are actually read-only. For now, just pass it through.
-        self.memory[addr as usize] = value
+        self.memory[addr as usize] = value;
+    }
+
+    pub fn bulk_write_memory(&mut self, addr: u16, values: &Vec<u8>) -> usize {
+        let end_addr = addr as usize + values.len();
+        if end_addr > self.memory.len() {
+            panic!("Values would overrun the memory buffer!");
+        } else {
+            for a in addr as usize..end_addr {
+                self.memory[a] = values[a];
+            }
+        }
+        end_addr
     }
 
     pub fn read_memory(&self, addr: u16) -> u8 {
         self.memory[addr as usize]
+    }
+
+    pub fn pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn execution_complete(&self) -> bool {
+        self.execution_complete
+    }
+
+    fn inc_pc(&mut self, amount: u16) {
+        if self.pc as usize + amount as usize >= self.memory.len() {
+            self.execution_complete = true;
+            println!("Exec complete!");
+        }
+        self.pc = self.pc.wrapping_add(amount);
     }
 
     fn carry_flag(&self) -> bool {
@@ -1431,6 +1463,7 @@ impl CPU6502 {
         if disassemble {
             println!("{} NOP", self.pc);
         }
+        self.inc_pc(1);
     }
 
     // Flag interactions
@@ -1441,7 +1474,7 @@ impl CPU6502 {
         } else {
             self.assign_carry(false);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn sec(&mut self, disassemble: bool) {
@@ -1450,7 +1483,7 @@ impl CPU6502 {
         } else {
             self.assign_carry(true);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
     
     fn cld(&mut self, disassemble: bool) {
@@ -1459,7 +1492,7 @@ impl CPU6502 {
         } else {
             self.assign_decimal(false);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn sed(&mut self, disassemble: bool) {
@@ -1468,7 +1501,7 @@ impl CPU6502 {
         } else {
             self.assign_decimal(true);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
     
     fn cli(&mut self, disassemble: bool) {
@@ -1477,7 +1510,7 @@ impl CPU6502 {
         } else {
             self.assign_interrupt(false);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn sei(&mut self, disassemble: bool) {
@@ -1486,7 +1519,7 @@ impl CPU6502 {
         } else {
             self.assign_interrupt(true);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
     
     fn clv(&mut self, disassemble: bool) {
@@ -1495,7 +1528,7 @@ impl CPU6502 {
         } else {
             self.assign_overflow(false);
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     // ARITHMETIC
@@ -1516,7 +1549,7 @@ impl CPU6502 {
         } else {
             self.adc(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
 
     }
 
@@ -1528,7 +1561,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.adc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn adc_zero_page_x(&mut self, disassemble: bool) -> () {
@@ -1539,7 +1572,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.adc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn adc_absolute(&mut self, disassemble: bool) -> () {
@@ -1552,7 +1585,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.adc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn adc_absolute_x(&mut self, disassemble: bool) -> () {
@@ -1565,7 +1598,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.adc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn adc_absolute_y(&mut self, disassemble: bool) -> () {
@@ -1578,7 +1611,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.adc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn adc_indirect_x(&mut self, disassemble: bool) -> () {
@@ -1590,7 +1623,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.adc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn adc_indirect_y(&mut self, disassemble: bool) -> () {
@@ -1602,7 +1635,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.adc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     /// Decrement memory by one
@@ -1620,7 +1653,7 @@ impl CPU6502 {
         } else {
             self.dec(addr as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn dec_zero_page_x(&mut self, disassemble: bool) {
@@ -1631,7 +1664,7 @@ impl CPU6502 {
             let effective = (addr + self.idx_x) as u16;
             self.dec(effective);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn dec_absolute(&mut self, disassemble: bool) {
@@ -1643,7 +1676,7 @@ impl CPU6502 {
         } else {
             self.dec(addr);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn dec_absolute_x(&mut self, disassemble: bool) {
@@ -1655,7 +1688,7 @@ impl CPU6502 {
         } else {
             self.dec(addr + self.idx_x as u16);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn dex(&mut self, disassemble: bool) {
@@ -1664,7 +1697,7 @@ impl CPU6502 {
         } else {
             self.idx_x -= 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn dey(&mut self, disassemble: bool) {
@@ -1673,7 +1706,7 @@ impl CPU6502 {
         } else {
             self.idx_y -= 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     /// Increment memory by one
@@ -1691,7 +1724,7 @@ impl CPU6502 {
         } else {
             self.inc(addr as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn inc_zero_page_x(&mut self, disassemble: bool) {
@@ -1702,7 +1735,7 @@ impl CPU6502 {
             let effective = (addr + self.idx_x) as u16;
             self.inc(effective);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn inc_absolute(&mut self, disassemble: bool) {
@@ -1714,7 +1747,7 @@ impl CPU6502 {
         } else {
             self.inc(addr);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn inc_absolute_x(&mut self, disassemble: bool) {
@@ -1726,7 +1759,7 @@ impl CPU6502 {
         } else {
             self.inc(addr + self.idx_x as u16);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn inx(&mut self, disassemble: bool) {
@@ -1735,7 +1768,7 @@ impl CPU6502 {
         } else {
             self.idx_x += 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn iny(&mut self, disassemble: bool) {
@@ -1744,7 +1777,7 @@ impl CPU6502 {
         } else {
             self.idx_y += 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     /// Subtract with borrow
@@ -1763,7 +1796,7 @@ impl CPU6502 {
         } else {
             self.sbc(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
 
     }
 
@@ -1775,7 +1808,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.sbc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sbc_zero_page_x(&mut self, disassemble: bool) -> () {
@@ -1786,7 +1819,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.sbc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sbc_absolute(&mut self, disassemble: bool) -> () {
@@ -1799,7 +1832,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.sbc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sbc_absolute_x(&mut self, disassemble: bool) -> () {
@@ -1812,7 +1845,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.sbc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sbc_absolute_y(&mut self, disassemble: bool) -> () {
@@ -1825,7 +1858,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.sbc(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sbc_indirect_x(&mut self, disassemble: bool) -> () {
@@ -1837,7 +1870,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.sbc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sbc_indirect_y(&mut self, disassemble: bool) -> () {
@@ -1849,7 +1882,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.sbc(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     // LOGICAL
@@ -1870,7 +1903,7 @@ impl CPU6502 {
         } else {
             self.and(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn and_zero_page(&mut self, disassemble: bool) -> () {
@@ -1881,7 +1914,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.and(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn and_zero_page_x(&mut self, disassemble: bool) -> () {
@@ -1892,7 +1925,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.and(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn and_absolute(&mut self, disassemble: bool) -> () {
@@ -1905,7 +1938,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.and(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn and_absolute_x(&mut self, disassemble: bool) -> () {
@@ -1918,7 +1951,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.and(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn and_absolute_y(&mut self, disassemble: bool) -> () {
@@ -1931,7 +1964,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.and(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn and_indirect_x(&mut self, disassemble: bool) -> () {
@@ -1945,7 +1978,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.and(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn and_indirect_y(&mut self, disassemble: bool) -> () {
@@ -1959,7 +1992,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.and(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     /// Logical OR with accumulator
@@ -1977,7 +2010,7 @@ impl CPU6502 {
         } else {
             self.ora(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ora_zero_page(&mut self, disassemble: bool) {
@@ -1988,7 +2021,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.ora(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ora_zero_page_x(&mut self, disassemble: bool) {
@@ -1999,7 +2032,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.ora(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ora_absolute(&mut self, disassemble: bool) {
@@ -2012,7 +2045,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.ora(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ora_absolute_x(&mut self, disassemble: bool) {
@@ -2025,7 +2058,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.ora(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ora_absolute_y(&mut self, disassemble: bool) {
@@ -2038,7 +2071,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.ora(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ora_indirect_x(&mut self, disassemble: bool) {
@@ -2050,7 +2083,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.ora(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ora_indirect_y(&mut self, disassemble: bool) {
@@ -2062,7 +2095,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.ora(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     /// Exclusive OR with accumulator
@@ -2080,7 +2113,7 @@ impl CPU6502 {
         } else {
             self.eor(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn eor_zero_page(&mut self, disassemble: bool) {
@@ -2091,7 +2124,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.eor(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn eor_zero_page_x(&mut self, disassemble: bool) {
@@ -2102,7 +2135,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.eor(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn eor_absolute(&mut self, disassemble: bool) {
@@ -2115,7 +2148,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.eor(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn eor_absolute_x(&mut self, disassemble: bool) {
@@ -2128,7 +2161,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.eor(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn eor_absolute_y(&mut self, disassemble: bool) {
@@ -2141,7 +2174,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.eor(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn eor_indirect_x(&mut self, disassemble: bool) {
@@ -2153,7 +2186,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.eor(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn eor_indirect_y(&mut self, disassemble: bool) {
@@ -2165,7 +2198,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.eor(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
 
@@ -2177,7 +2210,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn bit(&mut self, value: u8) {
@@ -2194,7 +2227,7 @@ impl CPU6502 {
         } else {
             self.bit(self.read_memory(addr as u16));
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn bit_absolute(&mut self, disassemble: bool) {
@@ -2206,7 +2239,7 @@ impl CPU6502 {
         } else {
             self.bit(self.read_memory(addr));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     // Comparisons
@@ -2226,7 +2259,7 @@ impl CPU6502 {
         } else {
             self.cmp(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cmp_zero_page(&mut self, disassemble: bool) {
@@ -2237,7 +2270,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cmp_zero_page_x(&mut self, disassemble: bool) {
@@ -2248,7 +2281,7 @@ impl CPU6502 {
             let val = self.read_memory((addr + self.idx_x) as u16);
             self.cmp(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cmp_absolute(&mut self, disassemble: bool) {
@@ -2261,7 +2294,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.cmp(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn cmp_absolute_x(&mut self, disassemble: bool) {
@@ -2274,7 +2307,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_x as u16);
             self.cmp(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn cmp_absolute_y(&mut self, disassemble: bool) {
@@ -2287,7 +2320,7 @@ impl CPU6502 {
             let val = self.read_memory(addr + self.idx_y as u16);
             self.cmp(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn cmp_indirect_x(&mut self, disassemble: bool) {
@@ -2299,7 +2332,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cmp_indirect_y(&mut self, disassemble: bool) {
@@ -2311,7 +2344,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cmp(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     /// Compare memory with index X
@@ -2329,7 +2362,7 @@ impl CPU6502 {
         } else {
             self.cpx(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cpx_zero_page(&mut self, disassemble: bool) {
@@ -2340,7 +2373,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cpx(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cpx_absolute(&mut self, disassemble: bool) {
@@ -2353,7 +2386,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cpx(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     /// Compare memory with index Y
@@ -2371,7 +2404,7 @@ impl CPU6502 {
         } else {
             self.cpy(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cpy_zero_page(&mut self, disassemble: bool) {
@@ -2382,7 +2415,7 @@ impl CPU6502 {
             let val = self.read_memory(addr as u16);
             self.cpy(val);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn cpy_absolute(&mut self, disassemble: bool) {
@@ -2395,7 +2428,7 @@ impl CPU6502 {
             let val = self.read_memory(addr);
             self.cpy(val);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     // Stack Ops
@@ -2405,7 +2438,7 @@ impl CPU6502 {
             println!("{} PHA", self.pc);
         }
         // TODO IMPL
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn php(&mut self, disassemble: bool) {
@@ -2413,7 +2446,7 @@ impl CPU6502 {
             println!("{} PHP", self.pc);
         }
         // TODO IMPL
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn pla(&mut self, disassemble: bool) {
@@ -2421,7 +2454,7 @@ impl CPU6502 {
             println!("{} PLA", self.pc);
         }
         // TODO IMPL
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn plp(&mut self, disassemble: bool) {
@@ -2429,7 +2462,7 @@ impl CPU6502 {
             println!("{} PLP", self.pc);
         }
         // TODO IMPL
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     // Shifts
@@ -2441,7 +2474,7 @@ impl CPU6502 {
             self.assign_carry(self.accumulator & 0b10000000 > 0);
             self.accumulator = self.accumulator << 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn asl_zero_page(&mut self, disassemble: bool) {
@@ -2453,7 +2486,7 @@ impl CPU6502 {
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
             self.write_memory(effective, self.read_memory(effective) << 1);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn asl_zero_page_x(&mut self, disassemble: bool) {
@@ -2465,7 +2498,7 @@ impl CPU6502 {
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
             self.write_memory(effective, self.read_memory(effective) << 1);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn asl_absolute(&mut self, disassemble: bool) {
@@ -2478,7 +2511,7 @@ impl CPU6502 {
             self.assign_carry(self.read_memory(addr) & 0b10000000 > 0);
             self.write_memory(addr, self.read_memory(addr) << 1);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn asl_absolute_x(&mut self, disassemble: bool) {
@@ -2492,7 +2525,7 @@ impl CPU6502 {
             self.assign_carry(self.read_memory(effective) & 0b10000000 > 0);
             self.write_memory(effective, self.read_memory(effective) << 1);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn lsr_a(&mut self, disassemble: bool) {
@@ -2504,7 +2537,7 @@ impl CPU6502 {
             }
             self.accumulator = self.accumulator >> 1;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn lsr_zero_page(&mut self, disassemble: bool) {
@@ -2518,7 +2551,7 @@ impl CPU6502 {
             }
             self.write_memory(effective, self.read_memory(effective) >> 1);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lsr_zero_page_x(&mut self, disassemble: bool) {
@@ -2532,7 +2565,7 @@ impl CPU6502 {
             }
             self.write_memory(effective, self.read_memory(effective) >> 1);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lsr_absolute(&mut self, disassemble: bool) {
@@ -2547,7 +2580,7 @@ impl CPU6502 {
             }
             self.write_memory(addr, self.read_memory(addr) >> 1);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn lsr_absolute_x(&mut self, disassemble: bool) {
@@ -2563,7 +2596,7 @@ impl CPU6502 {
             }
             self.write_memory(effective, self.read_memory(effective) >> 1);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn rol_a(&mut self, disassemble: bool) {
@@ -2579,7 +2612,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn rol_zero_page(&mut self, disassemble: bool) {
@@ -2597,7 +2630,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn rol_zero_page_x(&mut self, disassemble: bool) {
@@ -2615,7 +2648,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn rol_absolute(&mut self, disassemble: bool) {
@@ -2634,7 +2667,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn rol_absolute_x(&mut self, disassemble: bool) {
@@ -2654,7 +2687,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ror_a(&mut self, disassemble: bool) {
@@ -2670,7 +2703,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn ror_zero_page(&mut self, disassemble: bool) {
@@ -2687,7 +2720,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ror_zero_page_x(&mut self, disassemble: bool) {
@@ -2705,7 +2738,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ror_absolute(&mut self, disassemble: bool) {
@@ -2725,7 +2758,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ror_absolute_x(&mut self, disassemble: bool) {
@@ -2745,7 +2778,7 @@ impl CPU6502 {
                 self.assign_carry(true);
             }
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     // Branches/Jumps
@@ -2757,7 +2790,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BCC ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if !self.carry_flag() {
             self.branch(addr);
         }
@@ -2767,7 +2800,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BCS ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if self.carry_flag() {
             self.branch(addr);
         }
@@ -2777,7 +2810,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BEQ ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if self.zero_flag() {
             self.branch(addr);
         }
@@ -2787,7 +2820,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BMI ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if self.negative_flag() {
             self.branch(addr);
         }
@@ -2797,7 +2830,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BNE ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if !self.zero_flag() {
             self.branch(addr);
         }
@@ -2807,7 +2840,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BPL ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if !self.negative_flag() {
             self.branch(addr);
         }
@@ -2817,7 +2850,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BVC ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if !self.overflow_flag() {
             self.branch(addr);
         }
@@ -2827,7 +2860,7 @@ impl CPU6502 {
         let addr = self.read_memory(self.pc + 1);
         if disassemble {
             println!("{} BVS ${}", self.pc, addr);
-            self.pc += 2;
+            self.inc_pc(2);
         } else if self.overflow_flag() {
             self.branch(addr);
         }
@@ -2843,7 +2876,7 @@ impl CPU6502 {
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
             println!("{} JMP ${}", self.pc, addr);
-            self.pc += 3;
+            self.inc_pc(3);
         } else {
             self.jmp(addr);
         }
@@ -2855,7 +2888,7 @@ impl CPU6502 {
         let indirected = double_byte_from_two_single_bytes(low, high);
         if disassemble {
             println!("{} JMP (${})", self.pc, indirected);
-            self.pc += 3;
+            self.inc_pc(3);
         } else {
             let addr_low = self.read_memory(indirected);
             let addr_high = self.read_memory(indirected+1);
@@ -2870,7 +2903,7 @@ impl CPU6502 {
         let addr = double_byte_from_two_single_bytes(low, high);
         if disassemble {
             println!("{} JSR ${}", self.pc, addr);
-            self.pc += 3;
+            self.inc_pc(3);
         } else {
             // TODO IMPL (save PC+2 onto stack)
             self.jmp(addr);
@@ -2880,7 +2913,7 @@ impl CPU6502 {
     fn rti(&mut self, disassemble: bool) {
         if disassemble {
             println!("{} RTI", self.pc);
-            self.pc += 1;
+            self.inc_pc(1);
         } else {
             // TODO IMPL (Pull PSR and PC from stack)
         }
@@ -2892,7 +2925,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL (Pull PC from stack - the increment by one belowthen puts PC where it should be)
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     // Load/Store
@@ -2949,7 +2982,7 @@ impl CPU6502 {
         } else {
             self.lda(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lda_zero_page(&mut self, disassemble: bool) {
@@ -2960,7 +2993,7 @@ impl CPU6502 {
             let value = self.read_memory(addr as u16);
             self.lda(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lda_zero_page_x(&mut self, disassemble: bool) {
@@ -2972,7 +3005,7 @@ impl CPU6502 {
             let value = self.read_memory((addr + self.idx_x) as u16);
             self.lda(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lda_absolute(&mut self, disassemble: bool) {
@@ -2984,7 +3017,7 @@ impl CPU6502 {
         } else {
             self.lda(self.read_memory(addr));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn lda_absolute_x(&mut self, disassemble: bool) {
@@ -2996,7 +3029,7 @@ impl CPU6502 {
         } else {
             self.lda(self.read_memory(addr + self.idx_x as u16));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn lda_absolute_y(&mut self, disassemble: bool) {
@@ -3008,7 +3041,7 @@ impl CPU6502 {
         } else {
             self.lda(self.read_memory(addr + self.idx_y as u16));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn lda_indirect_x(&mut self, disassemble: bool) {
@@ -3018,7 +3051,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn lda_indirect_y(&mut self, disassemble: bool) {
@@ -3028,7 +3061,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldx_imm(&mut self, disassemble: bool) {
@@ -3038,7 +3071,7 @@ impl CPU6502 {
         } else {
             self.ldx(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldx_zero_page(&mut self, disassemble: bool) {
@@ -3049,7 +3082,7 @@ impl CPU6502 {
             let value = self.read_memory(addr as u16);
             self.ldx(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldx_zero_page_y(&mut self, disassemble: bool) {
@@ -3061,7 +3094,7 @@ impl CPU6502 {
         let value = self.read_memory((addr + self.idx_y) as u16);
             self.ldx(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldx_absolute(&mut self, disassemble: bool) {
@@ -3073,7 +3106,7 @@ impl CPU6502 {
         } else {
             self.ldx(self.read_memory(addr));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ldx_absolute_y(&mut self, disassemble: bool) {
@@ -3085,7 +3118,7 @@ impl CPU6502 {
         } else {
             self.ldx(self.read_memory(addr + self.idx_y as u16));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ldy_imm(&mut self, disassemble: bool) {
@@ -3095,7 +3128,7 @@ impl CPU6502 {
         } else {
             self.ldy(imm);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldy_zero_page(&mut self, disassemble: bool) {
@@ -3106,7 +3139,7 @@ impl CPU6502 {
             let value = self.read_memory(addr as u16);
             self.ldy(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldy_zero_page_x(&mut self, disassemble: bool) {
@@ -3118,7 +3151,7 @@ impl CPU6502 {
             let value = self.read_memory((addr + self.idx_x) as u16);
             self.ldy(value);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn ldy_absolute(&mut self, disassemble: bool) {
@@ -3130,7 +3163,7 @@ impl CPU6502 {
         } else {
             self.ldy(self.read_memory(addr));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn ldy_absolute_x(&mut self, disassemble: bool) {
@@ -3142,7 +3175,7 @@ impl CPU6502 {
         } else {
             self.ldy(self.read_memory(addr + self.idx_x as u16));
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sta_zero_page(&mut self, disassemble: bool) {
@@ -3152,7 +3185,7 @@ impl CPU6502 {
         } else {
             self.sta(addr as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sta_zero_page_x(&mut self, disassemble: bool) {
@@ -3163,7 +3196,7 @@ impl CPU6502 {
             // TODO Check Impl
             self.sta((addr + self.idx_x) as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sta_absolute(&mut self, disassemble: bool) {
@@ -3175,7 +3208,7 @@ impl CPU6502 {
         } else {
             self.sta(addr);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sta_absolute_x(&mut self, disassemble: bool) {
@@ -3188,7 +3221,7 @@ impl CPU6502 {
             // TODO Check impl
             self.sta(addr + self.idx_x as u16);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sta_absolute_y(&mut self, disassemble: bool) {
@@ -3201,7 +3234,7 @@ impl CPU6502 {
             // TODO Check impl
             self.sta(addr + self.idx_y as u16);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sta_indirect_x(&mut self, disassemble: bool) {
@@ -3211,7 +3244,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sta_indirect_y(&mut self, disassemble: bool) {
@@ -3221,7 +3254,7 @@ impl CPU6502 {
         } else {
             // TODO IMPL
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn stx_zero_page(&mut self, disassemble: bool) {
@@ -3231,7 +3264,7 @@ impl CPU6502 {
         } else {
             self.stx(addr as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn stx_zero_page_y(&mut self, disassemble: bool) {
@@ -3242,7 +3275,7 @@ impl CPU6502 {
             // TODO Check Impl
             self.stx((addr + self.idx_y) as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn stx_absolute(&mut self, disassemble: bool) {
@@ -3254,7 +3287,7 @@ impl CPU6502 {
         } else {
             self.stx(addr);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn sty_zero_page(&mut self, disassemble: bool) {
@@ -3264,7 +3297,7 @@ impl CPU6502 {
         } else {
             self.sty(addr as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sty_zero_page_x(&mut self, disassemble: bool) {
@@ -3275,7 +3308,7 @@ impl CPU6502 {
             // TODO Check Impl
             self.sty((addr + self.idx_x) as u16);
         }
-        self.pc += 2;
+        self.inc_pc(2);
     }
 
     fn sty_absolute(&mut self, disassemble: bool) {
@@ -3287,7 +3320,7 @@ impl CPU6502 {
         } else {
             self.sty(addr);
         }
-        self.pc += 3;
+        self.inc_pc(3);
     }
 
     fn tax(&mut self, disassemble: bool) {
@@ -3296,7 +3329,7 @@ impl CPU6502 {
         } else {
             self.idx_x = self.accumulator;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn tay(&mut self, disassemble: bool) {
@@ -3305,7 +3338,7 @@ impl CPU6502 {
         } else {
             self.idx_y = self.accumulator;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn tya(&mut self, disassemble: bool) {
@@ -3314,7 +3347,7 @@ impl CPU6502 {
         } else {
             self.accumulator = self.idx_y;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn tsx(&mut self, disassemble: bool) {
@@ -3323,7 +3356,7 @@ impl CPU6502 {
         } else {
             self.idx_x = self.sp;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn txa(&mut self, disassemble: bool) {
@@ -3332,7 +3365,7 @@ impl CPU6502 {
         } else {
             self.accumulator = self.idx_x;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
     fn txs(&mut self, disassemble: bool) {
@@ -3341,7 +3374,7 @@ impl CPU6502 {
         } else {
             self.sp = self.idx_x;
         }
-        self.pc += 1;
+        self.inc_pc(1);
     }
 
 }
